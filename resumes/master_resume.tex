@@ -98,7 +98,7 @@
 % ---------- Summary ----------
 \section{Summary}
 \small
-Backend / distributed-systems engineer with production ownership of device-to-cloud payment infrastructure at Paytm. Built and operated fleet infrastructure spanning IoT connectivity, zero-downtime migrations, CI/CD and OTA releases, and production LLM-agent tooling. Strong foundations in Java, C/C++, Python, networking, concurrency, storage systems, databases, and algorithms.
+Backend / distributed-systems engineer with production ownership of device-to-cloud payment infrastructure at Paytm: a 6M-device fleet serving 600 TPS of live transactions. Built and operated fleet infrastructure spanning IoT connectivity, zero-downtime migrations, CI/CD and OTA releases, and production LLM-agent tooling. Strong foundations in Java, C/C++, Python, networking, concurrency, storage systems, databases, and algorithms.
 
 % ---------- Experience ----------
 \section{Experience}
@@ -109,13 +109,13 @@ Backend / distributed-systems engineer with production ownership of device-to-cl
     {Software Engineer}{Noida, India}
 
   \begin{itemize}
-    \resumeItem{Owned Indonesia IoT launch end-to-end, moving device connectivity to TLS over HTTPS/MQTTS, validating certificate compatibility, handling regional timezones and transaction formatting; sole production owner for the market and its Java IoT backend services.}
+    \resumeItem{Owned Indonesia IoT launch end-to-end across 100K devices, moving device connectivity to TLS over HTTPS/MQTTS, validating certificate compatibility, handling regional timezones and transaction formatting; sole production owner for the market and its Java IoT backend services.}
 
-    \resumeItem{Led migration of the entire deployed device fleet to new backend hosts/endpoints, staging rollout by hardware family while maintaining zero downtime for live transaction traffic.}
+    \resumeItem{Led zero-downtime migration of 5M deployed devices to new backend hosts/endpoints, staging rollout by hardware family to protect live transaction traffic (600 TPS), including bill payments.}
 
     \resumeItem{Owned CI/CD and OTA release path for 18 device types, including Jenkins builds, delta updates, canary rollouts and post-release monitoring; fixed a delta-update failure blocking production distribution.}
 
-    \resumeItem{Designed fleet telemetry covering battery, transaction counters, cell ID, keep-alive and free-heap deltas with randomized request timing; fixed a messaging-client memory leak and use-after-free, and reduced 3--8s latency under concurrent downloads.}
+    \resumeItem{Designed fleet telemetry covering battery, transaction counters, cell ID, keep-alive and free-heap deltas with randomized request timing; fixed a messaging-client memory leak and use-after-free, and reduced 3--8s HTTP download latency on Soundbox devices under concurrent downloads.}
 
     \resumeItem{Built a Python + Slack LLM-agent orchestration system (\textasciitilde1,500 LOC) routing tickets to autonomous coding agents and production repositories; enabled 45 production changes through automated PR workflows.}
   \end{itemize}
@@ -184,7 +184,7 @@ Backend / distributed-systems engineer with production ownership of device-to-cl
 \textbf{Systems:} Networking, Concurrency, MQTT/MQTTS, TLS/Certificate Rotation, Rate Limiting, Caching, Retry/Backoff, WAL, Indexing \\
 \textbf{AI/LLM:} LLM Agent Orchestration, Agent Evaluation, MCP \\
 \textbf{Infrastructure:} AWS (EC2, S3, EKS, Lambda, IoT Core), Docker, Kubernetes, Linux, Jenkins CI/CD, Canary/Staged Rollouts, OTA/Delta Updates, RTOS Firmware, Kibana \\
-\textbf{Databases:} MySQL, PostgreSQL, Redis, MongoDB,
+\textbf{Databases:} MySQL, PostgreSQL, Redis, MongoDB
 
 % ---------- Education ----------
 \section{Education}

@@ -399,9 +399,19 @@
     if (!input) return null;
     if (viaBridge(input, { op: "probe" }) !== "ok") return null;
 
+    // One line per value, so a live tenant that commits one skill of ten says
+    // which step failed for the other nine. Recording only; nothing here
+    // changes what gets clicked. Read it with TA.skillTrace in the console.
+    const trace = [];
+    TA.skillTrace = trace;
+
     let picked = 0;
     for (const value of values) {
+      const step = { value, chipsBefore: 0, tab: "", committedByTab: false,
+                     popup: "", rows: [], picked: -1, clicked: "", landed: false, chipsAfter: 0 };
+      trace.push(step);
       const before = workdayChips(container);
+      step.chipsBefore = before;
       const shownBefore = shownIn(container);
       // Evidence that THIS widget took `text`: a new chip in its own list, or
       // its own display newly reading the value. Never "some popup closed" —
@@ -411,31 +421,45 @@
         workdayChips(container) > before ||
         (!containsWord(shownBefore, norm(text)) && containsWord(shownIn(container), norm(text)));
       input.focus({ preventScroll: true });
-      if (viaBridge(input, { op: "keydown", key: "Tab", value }) !== "ok") continue;
+      step.tab = viaBridge(input, { op: "keydown", key: "Tab", value });
+      if (step.tab !== "ok") continue;
 
       // The Tab keydown runs the search. On most values it also commits, but
       // where the taxonomy has more than one hit it just leaves the menu open
       // — the row still has to be clicked.
       let ok = await waitFor(() => landed(value), 700);
+      step.committedByTab = ok;
 
       if (!ok) {
         const { rows, owned } = await workdayRows(container, 3000);
+        const texts = rows.map((r) => r.innerText || r.textContent);
+        step.popup = rows.length ? (owned ? "owned" : "unowned") : "none";
+        step.rows = texts.slice(0, 8).map((t) => norm(t).slice(0, 60));
         // A popup that cannot be tied to this widget may be another control's
         // menu, so only a row reading exactly as the answer is clicked there.
-        const i = bestOptionIndex(rows.map((r) => r.innerText || r.textContent), value, !owned);
+        const i = bestOptionIndex(texts, value, !owned);
+        step.picked = i;
         const row = i >= 0 ? rows[i] : null;
         if (row) {
           const rowText = row.innerText || row.textContent || value;
+          step.clicked = norm(rowText).slice(0, 60);
           row.scrollIntoView({ block: "nearest" });
           row.click();
-          ok = await waitFor(() => landed(rowText) || landed(value), 1200);        }
+          ok = await waitFor(() => landed(rowText) || landed(value), 1200);
+        }
       }
+      step.landed = ok;
+      step.chipsAfter = workdayChips(container);
       if (ok) picked += 1;
       await sleep(150);
     }
 
     // The popup is dismissed rather than left hanging over the next field.
     document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    try {
+      console.info(`[TempoApply] skills: ${picked}/${values.length} committed`);
+      console.table(trace.map((s) => ({ ...s, rows: s.rows.join(" | ") })));
+    } catch (e) { /* the trace must never cost the fill */ }
     return picked;
   }
 
