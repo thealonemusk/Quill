@@ -6,13 +6,17 @@
 
 * { box-sizing: border-box; }
 
+html {
+  background: var(--surface);
+  color: var(--text-primary);
+}
+
 body {
+  position: relative;
   width: 286px;
   margin: 0;
   padding: 14px;
-  background: var(--surface);
-  color: var(--text-primary);
-  font: 13px/1.45 -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
+  font: 13px/1.45 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   -webkit-font-smoothing: antialiased;
   display: grid;
   gap: 10px;
@@ -21,16 +25,20 @@ body {
 header { display: flex; align-items: center; gap: 9px; }
 
 .bolt {
-  width: 30px; height: 30px; flex: none;
-  border-radius: 9px;
+  width: 28px; height: 28px; flex: none;
+  border-radius: 8px;
   background: var(--accent);
   display: grid; place-items: center;
-  color: var(--on-signal); font-size: 15px;
+  color: var(--on-signal);
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: -0.04em;
+  line-height: 1;
 }
 
 .titles { flex: 1; min-width: 0; }
 h1 { margin: 0; font-size: 14px; font-weight: 600; letter-spacing: -0.01em; }
-#subtitle { margin: 1px 0 0; font-size: 11px; color: var(--text-muted); }
+#subtitle { margin: 1px 0 0; font-size: 11px; color: var(--text-secondary); }
 
 .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--surface-3); flex: none; }
 .dot.up { background: var(--success); }

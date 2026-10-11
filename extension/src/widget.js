@@ -15,16 +15,11 @@
     .panel {
       position: fixed; right: 20px; bottom: 20px; z-index: 2147483647;
       width: 304px;
-      background: var(--surface); color: var(--text-primary);
-      border: 1px solid var(--border); border-radius: 16px;
-      box-shadow: 0 12px 32px rgba(0, 0, 0, .12), 0 2px 6px rgba(0, 0, 0, .06);
+      border-radius: 22px;
       overflow: hidden;
-      font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       font-size: 13px; line-height: 1.45;
       -webkit-font-smoothing: antialiased;
-    }
-    @media (prefers-color-scheme: dark) {
-      .panel { box-shadow: 0 12px 32px rgba(0, 0, 0, .5); }
     }
     * { box-sizing: border-box; font-family: inherit; }
     .panel.collapsed { width: auto; }
@@ -39,7 +34,8 @@
     .bolt {
       width: 22px; height: 22px; border-radius: 7px; flex: none;
       background: var(--accent); display: grid; place-items: center;
-      color: var(--on-signal); font-size: 12px;
+      color: var(--on-signal); font-size: 11px; font-weight: 700;
+      letter-spacing: -0.04em; line-height: 1;
     }
     .name {
       flex: 1; font-weight: 600; font-size: 13px;
@@ -95,6 +91,7 @@
     .stat {
       flex: 1; text-align: center; padding: 8px 4px;
       border-radius: 10px; background: var(--surface-2);
+      border: 1px solid var(--border);
     }
     .stat b { display: block; font-size: 15px; font-weight: 600; letter-spacing: -.02em; }
     .stat span {
@@ -135,9 +132,9 @@
   `;
 
   const HTML = `
-    <div class="panel" part="panel">
+    <div class="panel liquid-glass" part="panel">
       <div class="head" data-drag>
-        <div class="bolt">⚡</div>
+        <div class="bolt">T</div>
         <div class="name">TempoApply</div>
         <div class="dot" data-dot title="backend status"></div>
         <button class="icon-btn" data-toggle title="Collapse">–</button>

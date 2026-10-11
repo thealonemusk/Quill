@@ -27,6 +27,8 @@
   --danger: #e5484d;
   --danger-bg: color-mix(in srgb, var(--danger) 10%, transparent);
   --danger-border: color-mix(in srgb, var(--danger) 22%, transparent);
+  --ink: #111111;
+  --shadow-float: 0 16px 40px -20px color-mix(in srgb, var(--ink) 35%, transparent);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -39,8 +41,61 @@
     --border: rgba(255, 255, 255, 0.08);
     --text-primary: #f5f7fb;
     --text-secondary: #c5cad8;
-    --text-muted: #8b93a7;
+    --text-muted: #b4bccf;
     --success: #3ddc84;
     --danger: #ff6b73;
+  }
+}
+
+/* Frosted, but the fill stays close to --surface. The panel sits on arbitrary
+   pages; a thin wash lets the page flip the text to gray-on-gray. */
+.liquid-glass {
+  isolation: isolate;
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  -webkit-backdrop-filter: blur(22px) saturate(140%);
+  backdrop-filter: blur(22px) saturate(140%);
+  border: 1px solid var(--border);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, white 75%, transparent),
+    var(--shadow-float);
+  color: var(--text-primary);
+}
+
+.liquid-glass::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 22%;
+  z-index: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, white 18%, transparent),
+    transparent
+  );
+}
+
+.liquid-glass > * {
+  position: relative;
+  z-index: 1;
+}
+
+@media (prefers-color-scheme: dark) {
+  .liquid-glass {
+    background: color-mix(in srgb, var(--surface) 94%, transparent);
+    box-shadow:
+      inset 0 1px 0 color-mix(in srgb, white 14%, transparent),
+      var(--shadow-float);
+  }
+
+  .liquid-glass::before {
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, white 8%, transparent),
+      transparent
+    );
   }
 }
