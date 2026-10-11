@@ -12,7 +12,7 @@ import { ArrowLeft, Zap } from 'lucide-react';
 export default function AutopilotLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen flex-col bg-[var(--bg)]">
-      <header className="glass sticky top-0 z-20 border-b border-[var(--border)]">
+      <header className="glass sticky top-0 z-20">
         <div className="page-x mx-auto flex max-w-6xl flex-wrap items-center gap-x-4 gap-y-2 py-3 sm:py-4">
           <Link
             href="/"
@@ -23,15 +23,15 @@ export default function AutopilotLayout({ children }: { children: React.ReactNod
           </Link>
           <div className="h-5 w-px bg-[var(--border)]" />
           <div className="flex items-center gap-2">
-            <span className="grid h-7 w-7 place-items-center rounded-lg bg-[var(--accent)]">
-              <Zap className="h-4 w-4 text-white" />
+            <span className="bg-signal grid h-8 w-8 place-items-center rounded-lg">
+              <Zap className="h-4 w-4" />
             </span>
             <div>
-              <h1 className="text-base font-semibold tracking-tight text-[var(--text-primary)]">
+              <h1 className="page-title text-lg text-[var(--text-primary)]">
                 Autopilot
               </h1>
-              <p className="text-xs text-[var(--text-muted)]">
-                Select, tailor and fill — you approve every submission
+              <p className="mt-0.5 text-xs text-[var(--text-muted)]">
+                Select, tailor and fill. You approve every submission.
               </p>
             </div>
           </div>

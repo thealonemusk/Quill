@@ -5,7 +5,7 @@ export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElem
   return (
     <input
       className={clsx(
-        'w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-sm',
+        'w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-sm shadow-[var(--shadow-rest)]',
         'text-[var(--text-primary)] placeholder:text-[var(--text-muted)]',
         'outline-none transition-colors focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-ring)]',
         className,
@@ -19,7 +19,7 @@ export function Textarea({ className, ...props }: React.TextareaHTMLAttributes<H
   return (
     <textarea
       className={clsx(
-        'w-full resize-none rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-sm',
+        'w-full resize-none rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-sm shadow-[var(--shadow-rest)]',
         'text-[var(--text-primary)] placeholder:text-[var(--text-muted)]',
         'outline-none transition-colors focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-ring)]',
         className,
@@ -31,7 +31,7 @@ export function Textarea({ className, ...props }: React.TextareaHTMLAttributes<H
 
 export function Label({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <label className={clsx('mb-1.5 block text-sm font-medium text-[var(--text-secondary)]', className)}>
+    <label className={clsx('mb-1.5 block text-sm font-semibold text-[var(--text-primary)]', className)}>
       {children}
     </label>
   );

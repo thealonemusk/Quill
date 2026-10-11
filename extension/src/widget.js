@@ -7,32 +7,12 @@
 (function () {
   const TA = (window.__TA = window.__TA || {});
 
-  // Design tokens copied from dashboard/app/globals.css so the panel reads as
-  // part of the same product. The shadow root cannot inherit them — nothing of
-  // the host page's CSS reaches in, which is the point — so they are redeclared
-  // here. Dark mode follows the viewer's OS preference, because an injected
-  // panel has no access to the dashboard's theme toggle.
+  // Colors live in tokens.css, loaded into this shadow root. The root cannot
+  // inherit the page or the dashboard stylesheet.
   const STYLES = `
     :host { all: initial; }
 
     .panel {
-      --surface: #ffffff;
-      --surface-2: #f5f5f7;
-      --surface-3: #ebebed;
-      --border: rgba(0, 0, 0, 0.08);
-      --text-primary: #1d1d1f;
-      --text-secondary: #6e6e73;
-      --text-muted: #86868b;
-      --accent: #0071e3;
-      --accent-ring: rgba(0, 113, 227, 0.2);
-      --success: #34c759;
-      --success-bg: rgba(52, 199, 89, 0.12);
-      --warning: #ff9500;
-      --warning-bg: rgba(255, 149, 0, 0.12);
-      --danger: #ff3b30;
-      --danger-bg: rgba(255, 59, 48, 0.08);
-      --danger-border: rgba(255, 59, 48, 0.2);
-
       position: fixed; right: 20px; bottom: 20px; z-index: 2147483647;
       width: 304px;
       background: var(--surface); color: var(--text-primary);
@@ -44,22 +24,7 @@
       -webkit-font-smoothing: antialiased;
     }
     @media (prefers-color-scheme: dark) {
-      .panel {
-        --surface: #1c1c1e;
-        --surface-2: #2c2c2e;
-        --surface-3: #3a3a3c;
-        --border: rgba(255, 255, 255, 0.1);
-        --text-primary: #f5f5f7;
-        --text-secondary: #a1a1a6;
-        --text-muted: #6e6e73;
-        --accent: #0a84ff;
-        --accent-ring: rgba(10, 132, 255, 0.25);
-        --success-bg: rgba(52, 199, 89, 0.15);
-        --warning-bg: rgba(255, 149, 0, 0.16);
-        --danger-bg: rgba(255, 59, 48, 0.12);
-        --danger-border: rgba(255, 59, 48, 0.25);
-        box-shadow: 0 12px 32px rgba(0, 0, 0, .5);
-      }
+      .panel { box-shadow: 0 12px 32px rgba(0, 0, 0, .5); }
     }
     * { box-sizing: border-box; font-family: inherit; }
     .panel.collapsed { width: auto; }
@@ -74,7 +39,7 @@
     .bolt {
       width: 22px; height: 22px; border-radius: 7px; flex: none;
       background: var(--accent); display: grid; place-items: center;
-      color: #fff; font-size: 12px;
+      color: var(--on-signal); font-size: 12px;
     }
     .name {
       flex: 1; font-weight: 600; font-size: 13px;
@@ -116,7 +81,7 @@
     }
     .btn:active { transform: scale(.985); }
     .btn:disabled { opacity: .5; cursor: not-allowed; }
-    .btn.primary { background: var(--accent); color: #fff; }
+    .btn.primary { background: var(--accent); color: var(--on-signal); }
     .btn.primary:hover:not(:disabled) { filter: brightness(1.08); }
     .btn.ghost {
       background: var(--surface-2); color: var(--text-primary);
@@ -203,6 +168,18 @@
     </div>
   `;
 
+  let tokenCss = "";
+  if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.getURL) {
+    fetch(chrome.runtime.getURL("tokens.css"))
+      .then((res) => res.text())
+      .then((css) => {
+        tokenCss = css;
+        const style = root && root.querySelector("style");
+        if (style) style.textContent = tokenCss + STYLES;
+      })
+      .catch(() => {});
+  }
+
   let host = null;
   let root = null;
   let el = {};
@@ -228,7 +205,7 @@
     host.style.cssText = "all: initial; position: static;";
     root = host.attachShadow({ mode: "open" });
     const style = document.createElement("style");
-    style.textContent = STYLES;
+    style.textContent = tokenCss + STYLES;
     root.appendChild(style);
     const wrap = document.createElement("div");
     wrap.innerHTML = HTML;

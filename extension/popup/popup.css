@@ -1,41 +1,8 @@
 /*
- * Toolbar popup.
- *
- * Tokens mirror dashboard/app/globals.css so the extension and the dashboard
- * read as one product. Dark mode follows the OS here rather than the
- * dashboard's theme toggle, since a popup has no access to that setting.
+ * Toolbar popup. Colors come from ../tokens.css — the same file the in-page
+ * panel loads. Dark mode follows the OS.
  */
-:root {
-  --surface: #ffffff;
-  --surface-2: #f5f5f7;
-  --surface-3: #ebebed;
-  --border: rgba(0, 0, 0, 0.08);
-  --text-primary: #1d1d1f;
-  --text-secondary: #6e6e73;
-  --text-muted: #86868b;
-  --accent: #0071e3;
-  --accent-ring: rgba(0, 113, 227, 0.2);
-  --success: #34c759;
-  --danger: #ff3b30;
-  --danger-bg: rgba(255, 59, 48, 0.08);
-  --danger-border: rgba(255, 59, 48, 0.2);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --surface: #1c1c1e;
-    --surface-2: #2c2c2e;
-    --surface-3: #3a3a3c;
-    --border: rgba(255, 255, 255, 0.1);
-    --text-primary: #f5f5f7;
-    --text-secondary: #a1a1a6;
-    --text-muted: #6e6e73;
-    --accent: #0a84ff;
-    --accent-ring: rgba(10, 132, 255, 0.25);
-    --danger-bg: rgba(255, 59, 48, 0.12);
-    --danger-border: rgba(255, 59, 48, 0.25);
-  }
-}
+@import "../tokens.css";
 
 * { box-sizing: border-box; }
 
@@ -58,7 +25,7 @@ header { display: flex; align-items: center; gap: 9px; }
   border-radius: 9px;
   background: var(--accent);
   display: grid; place-items: center;
-  color: #fff; font-size: 15px;
+  color: var(--on-signal); font-size: 15px;
 }
 
 .titles { flex: 1; min-width: 0; }
@@ -107,7 +74,7 @@ button {
 }
 button:disabled { opacity: 0.5; cursor: not-allowed; }
 
-.primary { background: var(--accent); color: #fff; }
+.primary { background: var(--accent); color: var(--on-signal); }
 .primary:hover:not(:disabled) { filter: brightness(1.08); }
 .ghost {
   background: var(--surface-2);

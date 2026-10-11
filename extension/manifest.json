@@ -63,5 +63,11 @@
       "suggested_key": { "default": "Alt+Shift+F" },
       "description": "Autofill this application"
     }
-  }
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["tokens.css"],
+      "matches": ["<all_urls>"]
+    }
+  ]
 }

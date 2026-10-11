@@ -137,12 +137,12 @@ export const autopilot = {
 };
 
 export const TIER_STYLE: Record<Tier, { label: string; color: string; bg: string }> = {
-  FAANG: { label: 'FAANG', color: '#a855f7', bg: 'rgba(168,85,247,0.12)' },
-  ELITE: { label: 'Elite', color: '#0071e3', bg: 'rgba(0,113,227,0.12)' },
-  STRONG: { label: 'Strong', color: '#059669', bg: 'rgba(5,150,105,0.12)' },
-  KNOWN: { label: 'Known', color: '#d97706', bg: 'rgba(217,119,6,0.12)' },
-  UNKNOWN: { label: 'Unknown', color: '#64748b', bg: 'rgba(100,116,139,0.12)' },
-  EXCLUDED: { label: 'Excluded', color: '#dc2626', bg: 'rgba(220,38,38,0.12)' },
+  FAANG: { label: 'FAANG', color: 'var(--tier-faang)', bg: 'var(--tier-faang-bg)' },
+  ELITE: { label: 'Elite', color: 'var(--signal)', bg: 'var(--signal-soft)' },
+  STRONG: { label: 'Strong', color: 'var(--success)', bg: 'var(--success-bg)' },
+  KNOWN: { label: 'Known', color: 'var(--tier-known)', bg: 'var(--tier-known-bg)' },
+  UNKNOWN: { label: 'Unknown', color: 'var(--tier-unknown)', bg: 'var(--tier-unknown-bg)' },
+  EXCLUDED: { label: 'Excluded', color: 'var(--danger)', bg: 'var(--danger-bg)' },
 };
 
 export const ROUTE_STYLE: Record<RouteKind, { label: string; hint: string }> = {

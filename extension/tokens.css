@@ -1,0 +1,46 @@
+/*
+ * Extension theme. The popup and the in-page panel both load this file.
+ *
+ * The panel's shadow root cannot see the dashboard stylesheet, so this is the
+ * extension copy of those tokens. Washes are mixed from the base color: change
+ * --signal, --success, or --danger and the ring, tint, and label follow.
+ * Dark mode follows the OS, because neither surface has the dashboard toggle.
+ */
+:root,
+:host,
+.panel {
+  --surface: #ffffff;
+  --surface-2: #f3f5fa;
+  --surface-3: #e7ebf3;
+  --border: rgba(17, 24, 39, 0.08);
+  --text-primary: #111111;
+  --text-secondary: #3d4458;
+  --text-muted: #8b93a7;
+  --signal: #3b6cff;
+  --on-signal: #ffffff;
+  --accent: var(--signal);
+  --accent-ring: color-mix(in srgb, var(--signal) 28%, transparent);
+  --success: #12a150;
+  --success-bg: color-mix(in srgb, var(--success) 12%, transparent);
+  --warning: #d97706;
+  --warning-bg: color-mix(in srgb, var(--warning) 12%, transparent);
+  --danger: #e5484d;
+  --danger-bg: color-mix(in srgb, var(--danger) 10%, transparent);
+  --danger-border: color-mix(in srgb, var(--danger) 22%, transparent);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root,
+  :host,
+  .panel {
+    --surface: #161922;
+    --surface-2: #1e2330;
+    --surface-3: #2a3142;
+    --border: rgba(255, 255, 255, 0.08);
+    --text-primary: #f5f7fb;
+    --text-secondary: #c5cad8;
+    --text-muted: #8b93a7;
+    --success: #3ddc84;
+    --danger: #ff6b73;
+  }
+}
