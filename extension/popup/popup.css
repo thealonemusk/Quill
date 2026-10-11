@@ -26,14 +26,9 @@ header { display: flex; align-items: center; gap: 9px; }
 
 .bolt {
   width: 28px; height: 28px; flex: none;
-  border-radius: 8px;
-  background: var(--accent);
-  display: grid; place-items: center;
-  color: var(--on-signal);
-  font-weight: 700;
-  font-size: 13px;
-  letter-spacing: -0.04em;
-  line-height: 1;
+  border-radius: 7px;
+  display: block;
+  object-fit: cover;
 }
 
 .titles { flex: 1; min-width: 0; }
@@ -118,7 +113,7 @@ footer {
   border-top: 1px solid var(--border);
   padding-top: 9px;
 }
-footer a { color: var(--accent); text-decoration: none; }
+footer a { color: var(--signal-ink); text-decoration: none; }
 footer a:hover { text-decoration: underline; }
 
 kbd {

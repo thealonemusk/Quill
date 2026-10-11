@@ -219,7 +219,7 @@ export function JobRow({
                 ? 'text-[var(--success)]'
                 : applyBusy
                   ? 'text-[var(--text-muted)] opacity-40'
-                  : 'text-[var(--text-muted)] hover:bg-[var(--surface-3)] hover:text-[var(--accent)] lg:opacity-0 lg:group-hover:opacity-100',
+                  : 'text-[var(--text-muted)] hover:bg-[var(--surface-3)] hover:text-[var(--signal-ink)] lg:opacity-0 lg:group-hover:opacity-100',
             )}
           >
             <Send className="h-4 w-4" />
@@ -234,8 +234,8 @@ export function JobRow({
               visited
                 ? 'text-[var(--success)] opacity-100'
                 : alwaysShowOpen
-                  ? 'text-[var(--accent)] opacity-100 hover:bg-[var(--surface-3)]'
-                  : 'text-[var(--text-muted)] hover:bg-[var(--surface-3)] hover:text-[var(--accent)] lg:opacity-0 lg:group-hover:opacity-100',
+                  ? 'text-[var(--signal-ink)] opacity-100 hover:bg-[var(--surface-3)]'
+                  : 'text-[var(--text-muted)] hover:bg-[var(--surface-3)] hover:text-[var(--signal-ink)] lg:opacity-0 lg:group-hover:opacity-100',
             )}
             title={alwaysShowOpen ? 'Open and fill manually' : visited ? 'Already visited' : 'Open posting'}
           >

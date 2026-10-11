@@ -44,9 +44,7 @@ export function Sidebar() {
       <aside className="liquid-glass sticky top-3 ml-3 mb-3 hidden h-[calc(100vh-1.5rem)] w-[var(--sidebar-width)] shrink-0 flex-col rounded-[28px] lg:flex">
         <div className="px-5 py-6">
           <div className="flex items-center gap-2.5">
-            <span className="bg-signal grid h-8 w-8 place-items-center rounded-lg text-sm font-extrabold">
-              Q
-            </span>
+            <img src="/icon.png" alt="" className="h-8 w-8" />
             <p className="text-lg font-bold tracking-tight">Quill</p>
           </div>
         </div>
@@ -98,7 +96,7 @@ export function Sidebar() {
               aria-current={active ? 'page' : undefined}
               className={clsx(
                 'flex flex-1 flex-col items-center justify-center gap-1 py-2.5 text-[11px] font-semibold transition-colors',
-                active ? 'text-[var(--signal)]' : 'text-[var(--text-secondary)]',
+                active ? 'text-[var(--signal-ink)]' : 'text-[var(--text-secondary)]',
               )}
             >
               <Icon className="h-5 w-5" />

@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { ArrowLeft, Zap } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 
 /**
  * Shell for the autopilot section.
@@ -23,9 +23,7 @@ export default function AutopilotLayout({ children }: { children: React.ReactNod
           </Link>
           <div className="h-5 w-px bg-[var(--border)]" />
           <div className="flex items-center gap-2">
-            <span className="bg-signal grid h-8 w-8 place-items-center rounded-lg">
-              <Zap className="h-4 w-4" />
-            </span>
+            <img src="/icon.png" alt="" className="h-8 w-8" />
             <div>
               <h1 className="page-title text-lg text-[var(--text-primary)]">
                 Autopilot

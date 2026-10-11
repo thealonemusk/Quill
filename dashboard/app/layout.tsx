@@ -5,8 +5,7 @@ import { ThemeProvider } from '@/components/ThemeProvider';
 export const metadata: Metadata = {
   title: 'Quill',
   description: 'Job discovery for early-career engineers',
-  // No `icons` override: the merge removed public/vercel.png, which the old
-  // override pointed at. app/favicon.ico is picked up automatically.
+  icons: { icon: '/icon.png' },
 };
 
 // `viewportFit: 'cover'` lets the page paint into the iPhone's safe areas; the

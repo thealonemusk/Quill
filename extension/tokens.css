@@ -10,14 +10,15 @@
 :host,
 .panel {
   --surface: #ffffff;
-  --surface-2: #f3f5fa;
-  --surface-3: #e7ebf3;
-  --border: rgba(17, 24, 39, 0.08);
-  --text-primary: #111111;
-  --text-secondary: #3d4458;
-  --text-muted: #8b93a7;
-  --signal: #3b6cff;
-  --on-signal: #ffffff;
+  --surface-2: #eef3ec;
+  --surface-3: #e3ebdf;
+  --border: rgba(23, 28, 23, 0.08);
+  --text-primary: #171c17;
+  --text-secondary: #3d4a3e;
+  --text-muted: #7d8b7e;
+  --signal: #45c740;
+  --on-signal: #171c17;
+  --signal-ink: color-mix(in srgb, var(--signal) 38%, var(--on-signal));
   --accent: var(--signal);
   --accent-ring: color-mix(in srgb, var(--signal) 28%, transparent);
   --success: #12a150;
@@ -27,7 +28,7 @@
   --danger: #e5484d;
   --danger-bg: color-mix(in srgb, var(--danger) 10%, transparent);
   --danger-border: color-mix(in srgb, var(--danger) 22%, transparent);
-  --ink: #111111;
+  --ink: #171c17;
   --shadow-float: 0 16px 40px -20px color-mix(in srgb, var(--ink) 35%, transparent);
 }
 
@@ -35,13 +36,14 @@
   :root,
   :host,
   .panel {
-    --surface: #161922;
-    --surface-2: #1e2330;
-    --surface-3: #2a3142;
+    --surface: #171c17;
+    --surface-2: #1e261f;
+    --surface-3: #2a342c;
     --border: rgba(255, 255, 255, 0.08);
     --text-primary: #f5f7fb;
     --text-secondary: #c5cad8;
     --text-muted: #b4bccf;
+    --signal-ink: var(--signal);
     --success: #3ddc84;
     --danger: #ff6b73;
   }

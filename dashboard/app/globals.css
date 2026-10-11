@@ -5,20 +5,22 @@
 @tailwind utilities;
 
 :root {
-  --bg: #f4f6fb;
+  --bg: #f3f6f2;
   --surface: #ffffff;
-  --surface-2: #f3f5fa;
-  --surface-3: #e7ebf3;
-  --border: rgba(17, 24, 39, 0.08);
-  --text-primary: #111111;
-  --text-secondary: #3d4458;
-  --text-muted: #8b93a7;
-  /* One action color. --accent is the same value; --on-signal is the label
-     that sits on it. Change --signal and both follow. */
-  --signal: #3b6cff;
-  --on-signal: #ffffff;
+  --surface-2: #eef3ec;
+  --surface-3: #e3ebdf;
+  --border: rgba(23, 28, 23, 0.08);
+  --text-primary: #171c17;
+  --text-secondary: #3d4a3e;
+  --text-muted: #7d8b7e;
+  /* Fill is the mark's green. --on-signal is the black that sits on it.
+     --signal-ink is the same green, darkened so it can be text on a light
+     page. Change --signal and the tint, ring, and ink follow. */
+  --signal: #45c740;
+  --on-signal: #171c17;
+  --signal-ink: color-mix(in srgb, var(--signal) 38%, var(--on-signal));
   --signal-soft: color-mix(in srgb, var(--signal) 14%, var(--surface));
-  --on-signal-soft: var(--signal);
+  --on-signal-soft: var(--signal-ink);
   --accent: var(--signal);
   --accent-ring: color-mix(in srgb, var(--signal) 28%, transparent);
   --shadow-signal: 0 10px 24px -14px color-mix(in srgb, var(--signal) 80%, transparent);
@@ -28,12 +30,12 @@
   --danger-bg: color-mix(in srgb, var(--danger) 10%, transparent);
   --danger-border: color-mix(in srgb, var(--danger) 22%, transparent);
   --sidebar-width: 15rem;
-  --ink: #111111;
+  --ink: #171c17;
   --on-ink: #ffffff;
   --shadow-rest: 0 1px 2px color-mix(in srgb, var(--ink) 6%, transparent);
   --shadow-card: 0 16px 40px -28px color-mix(in srgb, var(--ink) 45%, transparent);
   --shadow-float: 0 16px 40px -20px color-mix(in srgb, var(--ink) 55%, transparent);
-  --chrome: #111111;
+  --chrome: #171c17;
   --chrome-text: #ffffff;
   --chrome-muted: rgba(255, 255, 255, 0.62);
   --chrome-line: rgba(255, 255, 255, 0.1);
@@ -54,17 +56,18 @@
 }
 
 .dark {
-  --bg: #0c0e14;
-  --surface: #161922;
-  --surface-2: #1e2330;
-  --surface-3: #2a3142;
+  --bg: #101410;
+  --surface: #171c17;
+  --surface-2: #1e261f;
+  --surface-3: #2a342c;
   --border: rgba(255, 255, 255, 0.08);
   --text-primary: #f5f7fb;
   --text-secondary: #c5cad8;
   --text-muted: #8b93a7;
+  --signal-ink: var(--signal);
   --success: #3ddc84;
   --danger: #ff6b73;
-  --chrome: #0a0b10;
+  --chrome: #0c100c;
 }
 
 * {

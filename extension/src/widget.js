@@ -32,10 +32,8 @@
     .panel.collapsed .head { border-bottom: none; }
     .head:active { cursor: grabbing; }
     .bolt {
-      width: 22px; height: 22px; border-radius: 7px; flex: none;
-      background: var(--accent); display: grid; place-items: center;
-      color: var(--on-signal); font-size: 11px; font-weight: 700;
-      letter-spacing: -0.04em; line-height: 1;
+      width: 22px; height: 22px; border-radius: 6px; flex: none;
+      display: block; object-fit: cover;
     }
     .name {
       flex: 1; font-weight: 600; font-size: 13px;
@@ -117,7 +115,7 @@
       border: 1px solid var(--danger-border);
     }
     .msg.info { background: var(--surface-2); color: var(--text-secondary); }
-    .msg a { color: var(--accent); }
+    .msg a { color: var(--signal-ink); }
     .msg b { font-weight: 600; }
 
     .foot { font-size: 10.5px; color: var(--text-muted); text-align: center; }
@@ -134,7 +132,7 @@
   const HTML = `
     <div class="panel liquid-glass" part="panel">
       <div class="head" data-drag>
-        <div class="bolt">Q</div>
+        <img class="bolt" alt="" />
         <div class="name">Quill</div>
         <div class="dot" data-dot title="backend status"></div>
         <button class="icon-btn" data-toggle title="Collapse">–</button>
@@ -206,6 +204,10 @@
     root.appendChild(style);
     const wrap = document.createElement("div");
     wrap.innerHTML = HTML;
+    const mark = wrap.querySelector(".bolt");
+    if (mark && typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.getURL) {
+      mark.src = chrome.runtime.getURL("icons/icon32.png");
+    }
     root.appendChild(wrap);
     (document.body || document.documentElement).appendChild(host);
 

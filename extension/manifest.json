@@ -66,7 +66,7 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["tokens.css"],
+      "resources": ["tokens.css", "icons/icon32.png"],
       "matches": ["<all_urls>"]
     }
   ]

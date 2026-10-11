@@ -132,7 +132,7 @@ export default function AutopilotPage() {
       {/* running banner */}
       {status?.running && (
         <div className="flex items-center gap-3 rounded-xl border border-[var(--accent)] bg-[var(--surface)] px-5 py-3.5">
-          <Loader2 className="h-4 w-4 shrink-0 animate-spin text-[var(--accent)]" />
+          <Loader2 className="h-4 w-4 shrink-0 animate-spin text-[var(--signal-ink)]" />
           <div className="flex-1 text-sm">
             <span className="font-medium text-[var(--text-primary)] capitalize">{status.stage}</span>
             {status.total > 0 && (
