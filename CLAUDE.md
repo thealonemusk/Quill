@@ -302,7 +302,7 @@ the same URL lookup. One run at a time (free-tier rate limits). Tests:
 Still on him: rotate the LinkedIn/Workday password (the review found them
 reused, and a copy sits in `config/.env.example`); move secrets out of the
 OneDrive-synced folder or accept that they sync; set `EXTENSION_ID` to pin
-the extension; check whether `github.com/thealonemusk/TempoApply` is public —
+the extension; check whether `github.com/thealonemusk/Quill` is public —
 the profile was pushed before it was untracked and stays in history.
 
 ## State as of 2026-09-23
