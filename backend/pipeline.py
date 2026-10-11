@@ -8,7 +8,6 @@ import urllib.parse
 from datetime import datetime, timedelta
 
 from loguru import logger
-from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from backend.applier.ats import detect_ats
@@ -59,6 +58,23 @@ def _is_cross_post(seen_hosts, host: str) -> bool:
     return bool(seen_hosts) and any(h != host for h in seen_hosts)
 
 
+def _known_jobs(db: Session):
+    """URLs already stored, and the hosts each title+company+location came from.
+
+    One query for the table. `upsert_jobs` used to ask again for every
+    candidate that survived the filters.
+    """
+    urls = set()
+    dups: dict = {}
+    rows = db.query(Job.url, Job.title, Job.company, Job.location).all()
+    for url, title, company, location in rows:
+        urls.add(url)
+        dkey = _dup_key(title, company, location)
+        if dkey:
+            dups.setdefault(dkey, set()).add(_host(url))
+    return urls, dups
+
+
 def upsert_jobs(jobs: list, db: Session) -> int:
     """Insert new jobs, skipping anything the seen ledger says we already handled.
 
@@ -68,6 +84,10 @@ def upsert_jobs(jobs: list, db: Session) -> int:
     count = 0
     # One query for the whole batch instead of a SELECT per candidate.
     blocked_urls, _ = seen_ledger.load_blocklist(db)
+    known_urls, known_dups = _known_jobs(db)
+    ledger = seen_ledger.load_rows(
+        db, (seen_ledger.url_key(job.get("url", "")) for job in jobs)
+    )
     batch_urls = set()
     # dup key -> hosts it was accepted from (see `_is_cross_post`).
     batch_dups: dict = {}
@@ -102,20 +122,20 @@ def upsert_jobs(jobs: list, db: Session) -> int:
             company_lower = company.lower()
             if any(exc in company_lower for exc in excluded):
                 logger.info(f"Skipping excluded company: {company}")
-                seen_ledger.record(db, job_data, "filtered", f"Excluded company: {company}")
+                seen_ledger.record(db, job_data, "filtered", f"Excluded company: {company}", cache=ledger)
                 continue
 
         ok, reason = passes_hard_filters(job_data, max_years=max_exp_years)
         if not ok:
             logger.info(f"Hard filter excluded [{company} - {title}]: {reason}")
-            seen_ledger.record(db, job_data, "filtered", reason)
+            seen_ledger.record(db, job_data, "filtered", reason, cache=ledger)
             continue
 
         if job_data.get("platform") == "company_careers":
             eligible, reason = is_career_listing_eligible(job_data)
             if not eligible:
                 logger.info(f"Career listing excluded [{company} - {title}]: {reason}")
-                seen_ledger.record(db, job_data, "filtered", reason)
+                seen_ledger.record(db, job_data, "filtered", reason, cache=ledger)
                 continue
 
         score, fit_reason = score_job(
@@ -127,7 +147,8 @@ def upsert_jobs(jobs: list, db: Session) -> int:
         if score < min_score:
             logger.info(f"Below min score ({score} < {min_score}): [{company} - {title}]")
             seen_ledger.record(
-                db, job_data, "filtered", f"Below min score: {score} < {min_score}"
+                db, job_data, "filtered", f"Below min score: {score} < {min_score}",
+                cache=ledger,
             )
             continue
 
@@ -140,24 +161,13 @@ def upsert_jobs(jobs: list, db: Session) -> int:
         if dkey:
             batch_dups.setdefault(dkey, set()).add(host)
 
-        existing_url = db.query(Job).filter(Job.url == url).first()
-        if existing_url:
+        if url in known_urls:
             continue
 
-        # Equality on lower(), not ilike: ilike read "_" and "%" in a title
-        # as wildcards. Candidates are then narrowed in Python on location and
-        # host, the same rule as within the batch.
-        if dkey:
-            same_name = db.query(Job.url, Job.title, Job.company, Job.location).filter(
-                func.lower(Job.title) == (title or "").strip().lower(),
-                func.lower(Job.company) == (company or "").strip().lower(),
-            ).all()
-            hosts = {
-                _host(r_url) for r_url, r_title, r_company, r_loc in same_name
-                if _dup_key(r_title, r_company, r_loc) == dkey
-            }
-            if _is_cross_post(hosts, host):
-                continue
+        # Equality on the normalized key, not ilike: ilike read "_" and "%"
+        # in a title as wildcards. Hosts were loaded with the same key.
+        if dkey and _is_cross_post(known_dups.get(dkey), host):
+            continue
 
         missing_skills = json.dumps(job_data.get("missing_skills", []))
         job = Job(
@@ -181,7 +191,7 @@ def upsert_jobs(jobs: list, db: Session) -> int:
             status="discovered",
         )
         db.add(job)
-        seen_ledger.record(db, job_data, "discovered", fit_reason)
+        seen_ledger.record(db, job_data, "discovered", fit_reason, cache=ledger)
         count += 1
     db.commit()
     return count

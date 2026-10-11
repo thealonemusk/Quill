@@ -144,17 +144,39 @@ def load_blocklist(db: Session) -> Tuple[Set[str], Set[str]]:
     return urls, tcs
 
 
+def load_rows(db: Session, keys: Iterable[str]) -> Dict[str, SeenJob]:
+    """Ledger rows for a batch of url keys, in a handful of queries.
+
+    SQLite refuses an IN list past a few hundred bindings, so the keys are
+    read in chunks. The caller keeps the dict and passes it to `record`,
+    which then does not look each job up again.
+    """
+    unique = [key for key in dict.fromkeys(keys) if key]
+    found: Dict[str, SeenJob] = {}
+    for start in range(0, len(unique), 400):
+        chunk = unique[start:start + 400]
+        rows = db.query(SeenJob).filter(SeenJob.url_key.in_(chunk)).all()
+        found.update({row.url_key: row for row in rows})
+    return found
+
+
 def record(
     db: Session,
     job_data: Dict,
     status: str = "seen",
     reason: str = "",
     commit: bool = False,
+    cache: Optional[Dict[str, SeenJob]] = None,
 ) -> Optional[SeenJob]:
     """Insert or refresh the ledger row for a scraped job dict.
 
     An existing blocking status is never downgraded - a scan re-seeing a job
     the user already applied to must not reset it to "discovered".
+
+    `cache` is the dict from `load_rows` for this batch. Autoflush is off, so
+    a second sight of a url inserted earlier in the same batch would not be
+    visible to a fresh SELECT; the cache is what makes that second sight
+    update the row instead of inserting another.
     """
     url = job_data.get("url", "")
     key = url_key(url)
@@ -164,7 +186,10 @@ def record(
     title = job_data.get("title", "") or ""
     company = job_data.get("company", "") or ""
 
-    row = db.query(SeenJob).filter(SeenJob.url_key == key).first()
+    if cache is not None:
+        row = cache.get(key)
+    else:
+        row = db.query(SeenJob).filter(SeenJob.url_key == key).first()
     if row is None:
         row = SeenJob(
             url_key=key,
@@ -178,6 +203,8 @@ def record(
             times_seen=1,
         )
         db.add(row)
+        if cache is not None:
+            cache[key] = row
     else:
         row.times_seen = (row.times_seen or 0) + 1
         if not row.tc_key:

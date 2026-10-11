@@ -14,6 +14,7 @@ if sys.platform == "win32":
 from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks, Query, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, field_validator
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from loguru import logger
 
@@ -709,14 +710,22 @@ async def apply_single_job(job_id: str, background_tasks: BackgroundTasks, db: S
 @app.get("/api/analytics")
 def get_analytics(db: Session = Depends(get_db)):
     """Return aggregated application stats."""
-    total = db.query(Job).count()
-    by_status = {}
-    for status in ["discovered", "scored", "tailored", "applied", "interviewing", "rejected", "offer"]:
-        by_status[status] = db.query(Job).filter(Job.status == status).count()
+    status_counts = dict(
+        db.query(Job.status, func.count(Job.id)).group_by(Job.status).all()
+    )
+    by_status = {
+        status: status_counts.get(status, 0)
+        for status in (
+            "discovered", "scored", "tailored", "applied",
+            "interviewing", "rejected", "offer",
+        )
+    }
+    total = sum(status_counts.values())
 
-    by_platform = {}
-    for platform in ALL_PLATFORMS:
-        by_platform[platform] = db.query(Job).filter(Job.platform == platform).count()
+    platform_counts = dict(
+        db.query(Job.platform, func.count(Job.id)).group_by(Job.platform).all()
+    )
+    by_platform = {platform: platform_counts.get(platform, 0) for platform in ALL_PLATFORMS}
 
     top_companies = (
         db.query(Job.company, Job.relevance_score)
