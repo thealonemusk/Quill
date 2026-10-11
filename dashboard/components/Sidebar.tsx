@@ -45,9 +45,9 @@ export function Sidebar() {
         <div className="px-5 py-6">
           <div className="flex items-center gap-2.5">
             <span className="bg-signal grid h-8 w-8 place-items-center rounded-lg text-sm font-extrabold">
-              T
+              Q
             </span>
-            <p className="text-lg font-bold tracking-tight">Tempo</p>
+            <p className="text-lg font-bold tracking-tight">Quill</p>
           </div>
         </div>
 

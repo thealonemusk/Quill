@@ -573,7 +573,7 @@
       return {
         stage: "auth",
         step,
-        message: "Sign in or create your Workday account first. TempoApply never fills passwords.",
+        message: "Sign in or create your Workday account first. Quill never fills passwords.",
       };
     }
 

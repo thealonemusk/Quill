@@ -134,8 +134,8 @@
   const HTML = `
     <div class="panel liquid-glass" part="panel">
       <div class="head" data-drag>
-        <div class="bolt">T</div>
-        <div class="name">TempoApply</div>
+        <div class="bolt">Q</div>
+        <div class="name">Quill</div>
         <div class="dot" data-dot title="backend status"></div>
         <button class="icon-btn" data-toggle title="Collapse">–</button>
         <button class="icon-btn" data-close title="Hide on this page">×</button>

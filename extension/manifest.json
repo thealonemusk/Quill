@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "TempoApply Autofill",
+  "name": "Quill",
   "version": "1.0.0",
   "description": "One-click autofill for job applications — Workday, Glassdoor, Greenhouse, Lever, Ashby and any careers form.",
   "permissions": ["storage", "tabs"],
@@ -44,7 +44,7 @@
   "minimum_chrome_version": "111",
   "action": {
     "default_popup": "popup/popup.html",
-    "default_title": "TempoApply Autofill",
+    "default_title": "Quill",
     "default_icon": {
       "16": "icons/icon16.png",
       "32": "icons/icon32.png",

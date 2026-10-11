@@ -52,7 +52,7 @@ $("fill").addEventListener("click", async () => {
     await chrome.tabs.sendMessage(tab.id, { type: "TA_RUN", opts: {} }, { frameId: 0 });
     window.close();
   } catch (e) {
-    alertUser("This page has no TempoApply panel — reload it and try again.");
+    alertUser("This page has no Quill panel — reload it and try again.");
   }
 });
 
@@ -63,7 +63,7 @@ $("show").addEventListener("click", async () => {
     await chrome.tabs.sendMessage(tab.id, { type: "TA_SHOW" }, { frameId: 0 });
     window.close();
   } catch (e) {
-    alertUser("This page has no TempoApply panel — reload it and try again.");
+    alertUser("This page has no Quill panel — reload it and try again.");
   }
 });
 

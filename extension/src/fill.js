@@ -457,7 +457,7 @@
     // The popup is dismissed rather than left hanging over the next field.
     document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
     try {
-      console.info(`[TempoApply] skills: ${picked}/${values.length} committed`);
+      console.info(`[Quill] skills: ${picked}/${values.length} committed`);
       console.table(trace.map((s) => ({ ...s, rows: s.rows.join(" | ") })));
     } catch (e) { /* the trace must never cost the fill */ }
     return picked;
