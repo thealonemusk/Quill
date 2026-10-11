@@ -152,9 +152,9 @@ export default function SettingsPage() {
 
   return (
     <>
-      <header className="page-x glass sticky top-0 z-20 border-b border-[var(--border)] py-4 sm:py-5">
-        <h1 className="text-2xl font-semibold tracking-tight text-[var(--text-primary)]">Settings</h1>
-        <p className="mt-0.5 text-sm text-[var(--text-muted)]">Applicant profile, preferences, and credentials</p>
+      <header className="page-x glass sticky top-0 z-20 py-4 sm:py-5">
+        <h1 className="page-title text-4xl text-[var(--text-primary)] sm:text-5xl">Settings</h1>
+        <p className="mt-2 text-sm text-[var(--text-muted)]">Applicant profile, preferences, and credentials</p>
       </header>
 
       <div className="page-x pb-nav flex-1 overflow-y-auto pt-5 sm:pt-6">

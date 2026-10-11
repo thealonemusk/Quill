@@ -573,7 +573,7 @@
       return {
         stage: "auth",
         step,
-        message: "Sign in or create your Workday account first. TempoApply never fills passwords.",
+        message: "Sign in or create your Workday account first. Quill never fills passwords.",
       };
     }
 
@@ -597,5 +597,55 @@
     const text = (document.body ? document.body.innerText : "").slice(0, 4000).toLowerCase();
     const applyWords = /apply for|application form|submit your application|job application|personal information/.test(text);
     return applyWords && controls + customs >= 3;
+  };
+
+  // ── The job description, for tailoring ─────────────────────────────────────
+  //
+  // Most ATSs show the description on the page the form lives on (Greenhouse,
+  // Lever, Ashby) or on the posting page one click earlier (Workday), each in
+  // a container of its own. The ATS-specific selectors come first; the
+  // generic ones are last because `main`/`article` can hold the form too.
+  const JD_SELECTORS = [
+    '[data-automation-id="jobPostingDescription"]',          // Workday
+    ".job__description", ".job-post-content", "#content .job-post", // Greenhouse
+    '[data-qa="job-description"]', ".posting-page .section-wrapper", // Lever
+    '[class*="_descriptionText"]', ".ashby-job-posting-right-pane",  // Ashby
+    '[itemprop="description"]',                                  // SmartRecruiters, schema.org
+    ".iCIMS_JobContent",
+    '[class*="job-description" i]', '[id*="job-description" i]',
+    '[class*="jobDescription"]', '[id*="jobDescription"]',
+    '[data-testid*="description" i]',
+    "article", '[role="main"]', "main",
+  ];
+  // From here on the selectors are generic and may hold a form, not a job.
+  const JD_GENERIC_FROM = JD_SELECTORS.indexOf("article");
+  const JD_MIN = 300;
+  const JD_MAX = 20000;
+
+  /**
+   * The description on this page: `{ text, source, specific }`, or null.
+   * `specific` is false for a generic container (`main`, `article`), which
+   * on a form step is the form: it must not overwrite a description the
+   * posting page supplied, and ranks below one.
+   * A selection of at least JD_MIN characters wins — it is the user saying
+   * "this is the description" on a page whose markup nothing here recognises.
+   */
+  TA.jobDescription = function jobDescription() {
+    const tidy = (s) => (s || "").replace(/\s+/g, " ").trim().slice(0, JD_MAX);
+    const picked = tidy(window.getSelection ? String(window.getSelection()) : "");
+    if (picked.length >= JD_MIN) return { text: picked, source: "selection", specific: true };
+    for (const [i, sel] of JD_SELECTORS.entries()) {
+      let nodes;
+      try {
+        nodes = document.querySelectorAll(sel);
+      } catch (e) {
+        continue; // a selector this browser does not support
+      }
+      for (const node of nodes) {
+        const text = tidy(node.innerText || node.textContent);
+        if (text.length >= JD_MIN) return { text, source: "page", specific: i < JD_GENERIC_FROM };
+      }
+    }
+    return null;
   };
 })();

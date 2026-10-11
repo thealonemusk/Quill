@@ -138,6 +138,16 @@ from *assumed* Workday markup and passes regardless — it is not evidence.
   through React's own handler:
   `getReactProps(input).onKeyDown({key: "Tab", target: {value}})`, reading
   props off the `__reactProps$…` key on the input.
+- **The content script cannot see those props.** It runs in Chrome's
+  isolated world, which shares the DOM but not the page's JS properties, so
+  `__reactProps$…` is simply absent there. `src/react-bridge.js` runs in the
+  page world (`"world": "MAIN"` in the manifest) and makes the call when
+  `fill.js` asks through a `tempoapply:react` event. Until 2026-09-25 fill.js
+  read the props itself, so on every live tenant Skills fell back to typing,
+  while every suite stayed green, because `add_script_tag` injects into the
+  *page* world. `run_real_extension_worlds` (`--integration`) runs the fixture
+  through the unpacked extension and evaluates in its own world; it fails with
+  the bridge removed. Any new use of a page JS property goes through the bridge.
 - **The menu is not inside the field.** It is a popup at `body` level,
   `[data-automation-widget="wd-popup"]`, tied back to its widget by
   `data-associated-widget`. A page-wide scan for options finds some other
@@ -218,7 +228,10 @@ output to the clipboard; neither submits anything.
   `SKIP: already filled` — a field skipped there never opens a widget, which
   is invisible from the page. Also the Add buttons and the entry containers.
 - `extension/test/trace-skills.js` — drives the Skills picker the way
-  `fill.js` does and names the step that fails. The decisive line is the
+  `fill.js` *used to* (typing; it predates the React commit path, and its
+  `CHIP_SELECTOR` still has the loose `*="selectedItem"`), and names the step
+  that fails. Pasted into the console it runs in the page world, so it can
+  never reproduce an isolated-world failure. The decisive line is the
   OPTION SCAN: it counts what `OPTION_SELECTOR` matches against what *looks*
   like an option by any reading, so "the menu renders but the extension cannot
   see it" is distinguished from "no menu" and from "clicked, but no chip
@@ -262,10 +275,34 @@ India-located job answers from the profile; a job abroad answers
 authorisation "No" and leaves sponsorship blank; an unknown page leaves both
 blank. Blank beats false.
 
+Tailoring runs on OpenRouter (`LLM_PROVIDER=openrouter`, model
+`openrouter/free`, which routes to whichever free model has capacity). Its
+first real run showed two gaps, both now gates: every rewrite exceeded the
+prompt's "within 15%" (122-160%) and the extra length carried unsupported
+claims ("collaborating asynchronously in distributed team environments") the
+fact guard cannot see — `MAX_REWRITE_GROWTH` refuses those; and a reasoning
+model can spend the whole token budget thinking — a truncated reply is retried
+once with double the budget. Concept terms ("performance tuning") absent from
+the master are still refused; whether to allow them is his call.
+
+**Tailor from the extension** (panel button "Tailor resume"). The job
+description comes from, best first: text he selected on the page; the one the
+scanner saved for this job; the ATS's own description container
+(`TA.jobDescription`, `JD_SELECTORS` in scrape.js); one remembered from the
+posting page earlier in the same tab — Workday's form steps show none, so the
+content script stores the posting page's description per tab in
+`chrome.storage.session` (same host, under an hour old). A generic `main` or
+`article` is never remembered: on a form step it is the form. The run takes
+minutes and extension requests time out in 12s, so `POST /api/autofill/tailor`
+starts it in a thread and `GET /api/autofill/tailor/{job_id}` is polled. An
+unknown page becomes a job row, so the next Autofill finds the tailored PDF by
+the same URL lookup. One run at a time (free-tier rate limits). Tests:
+`backend/api/test_tailor_endpoint.py`, `run_tailor_button` in run_tests.py.
+
 Still on him: rotate the LinkedIn/Workday password (the review found them
 reused, and a copy sits in `config/.env.example`); move secrets out of the
 OneDrive-synced folder or accept that they sync; set `EXTENSION_ID` to pin
-the extension; check whether `github.com/thealonemusk/TempoApply` is public —
+the extension; check whether `github.com/thealonemusk/Quill` is public —
 the profile was pushed before it was untracked and stays in history.
 
 ## State as of 2026-09-23

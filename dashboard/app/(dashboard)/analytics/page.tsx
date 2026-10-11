@@ -16,17 +16,18 @@ import {
 import { api } from '@/lib/api';
 import { PLATFORM_COLORS, platformLabel } from '@/lib/platforms';
 import type { Analytics } from '@/lib/types';
+import clsx from 'clsx';
 import { Card, CardDescription, CardTitle } from '@/components/ui/Card';
 
 const STATUS_COLORS: Record<string, string> = {
-  discovered: '#8E8E93',
-  scored: '#007AFF',
-  tailored: '#5856D6',
-  applied: '#34C759',
-  interviewing: '#FF9500',
-  rejected: '#FF3B30',
-  offer: '#FFD60A',
-  ignored: '#636366',
+  discovered: 'var(--chart-discovered)',
+  scored: 'var(--chart-scored)',
+  tailored: 'var(--chart-tailored)',
+  applied: 'var(--chart-applied)',
+  interviewing: 'var(--chart-interviewing)',
+  rejected: 'var(--chart-rejected)',
+  offer: 'var(--chart-offer)',
+  ignored: 'var(--chart-ignored)',
 };
 
 const tooltipStyle = {
@@ -52,7 +53,7 @@ export default function AnalyticsPage() {
           .map(([k, v]) => ({
             name: k.charAt(0).toUpperCase() + k.slice(1),
             value: v,
-            color: STATUS_COLORS[k] || '#8E8E93',
+            color: STATUS_COLORS[k] || 'var(--chart-discovered)',
           }))
       : [];
 
@@ -63,7 +64,7 @@ export default function AnalyticsPage() {
           .map(([k, v]) => ({
             name: platformLabel(k),
             value: v,
-            fill: PLATFORM_COLORS[k] || '#8E8E93',
+            fill: PLATFORM_COLORS[k] || 'var(--chart-discovered)',
           }))
       : [];
 
@@ -73,9 +74,9 @@ export default function AnalyticsPage() {
 
   return (
     <>
-      <header className="page-x glass sticky top-0 z-20 border-b border-[var(--border)] py-4 sm:py-5">
-        <h1 className="text-2xl font-semibold tracking-tight text-[var(--text-primary)]">Analytics</h1>
-        <p className="mt-0.5 text-sm text-[var(--text-muted)]">Pipeline overview</p>
+      <header className="page-x glass sticky top-0 z-20 py-4 sm:py-5">
+        <h1 className="page-title text-4xl text-[var(--text-primary)] sm:text-5xl">Analytics</h1>
+        <p className="mt-2 text-sm text-[var(--text-muted)]">Pipeline overview</p>
       </header>
 
       <div className="page-x pb-nav flex-1 overflow-y-auto pt-5 sm:pt-6">
@@ -86,14 +87,15 @@ export default function AnalyticsPage() {
             <>
               <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
                 {[
-                  { label: 'Total', value: data?.total_jobs || 0 },
-                  { label: 'Applied', value: applied },
-                  { label: 'Interviewing', value: interviewing },
-                  { label: 'Offers', value: offers },
+                  { label: 'Total', value: data?.total_jobs || 0, mark: 'bg-[var(--ink)]' },
+                  { label: 'Applied', value: applied, mark: 'bg-[var(--success)]' },
+                  { label: 'Interviewing', value: interviewing, mark: 'bg-[var(--accent)]' },
+                  { label: 'Offers', value: offers, mark: 'bg-[var(--chart-offer)]' },
                 ].map((s) => (
                   <Card key={s.label} padding>
+                    <span className={clsx('mb-3 block h-1.5 w-8 rounded-full', s.mark)} />
                     <p className="text-sm text-[var(--text-muted)]">{s.label}</p>
-                    <p className="mt-1 text-3xl font-semibold tabular-nums text-[var(--text-primary)]">{s.value}</p>
+                    <p className="page-title mt-2 text-4xl tabular-nums text-[var(--text-primary)]">{s.value}</p>
                   </Card>
                 ))}
               </div>

@@ -605,6 +605,15 @@ def test_tailor_end_to_end() -> None:
             check("refused rewrites are not 'llm used'", res.report.get("llm_used"), False)
             check("model_rewrites counts only accepted", res.report.get("model_rewrites"), 0)
             check("arranged", res.report.get("arranged"), True)
+
+            # A rewrite that grows past 115% is where an added claim goes.
+            long_slot = doc.editable_slots[1]
+            padded = long_slot.text + " — collaborating asynchronously in distributed team environments."
+            tailor._propose_rewrites = lambda *a, **k: ({long_slot.id: padded}, "fake")
+            grown = tailor.tailor("We need Java.", company="Acme", job_id="e2e00005-v", master=str(SAMPLE))
+            reasons = [r["reason"] for r in grown.report.get("rejected", [])]
+            check("an over-length rewrite is refused", any("longer than allowed" in r for r in reasons), True)
+            check("...and nothing was reworded", grown.report.get("model_rewrites"), 0)
             out = Path(res.pdf_path).parent
             check("no staging file left", (out / "resume.building.pdf").exists(), False)
 
@@ -742,8 +751,27 @@ def test_llm_resilience() -> None:
         calls.clear()
         script.update(primary=[APITimeoutError("timed out")], backup=['{"ok": 4}'])
         check("a timeout fails over at once", llm.ask_json("s", "u"), {"ok": 4})
+
         check("...after one attempt, not three", calls.count("primary"), 1)
         check("...and the model cools down", llm._down_until.get("primary", 0) > 0, True)
+
+        # A reasoning model spending the budget thinking: retry once, bigger.
+        budgets: list = []
+
+        def thinking(model, **kw):
+            budget = kw.get("max_tokens") or kw.get("max_completion_tokens")
+            budgets.append(budget)
+            done = budget >= 8000
+            return types.SimpleNamespace(choices=[types.SimpleNamespace(
+                finish_reason="stop" if done else "length",
+                message=types.SimpleNamespace(content='{"ok": 5}' if done else '{"ok":'))])
+
+        llm._down_until.clear()
+        fake.chat.completions.create = thinking
+        check("a truncated reply is retried with a bigger budget",
+              llm.ask_json("s", "u", max_tokens=4000), {"ok": 5})
+        check("...budget doubled once", budgets, [4000, 8000])
+        fake.chat.completions.create = create
     finally:
         (llm._client, llm.model_name, llm.fallback_model, llm.time.sleep) = saved[:4]
         llm._down_until.clear()

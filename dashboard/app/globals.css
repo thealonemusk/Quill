@@ -1,42 +1,73 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  --bg: #f5f5f7;
+  --bg: #f3f6f2;
   --surface: #ffffff;
-  --surface-2: #f5f5f7;
-  --surface-3: #ebebed;
-  --border: rgba(0, 0, 0, 0.08);
-  --text-primary: #1d1d1f;
-  --text-secondary: #6e6e73;
-  --text-muted: #86868b;
-  --accent: #0071e3;
-  --accent-ring: rgba(0, 113, 227, 0.2);
-  --success: #34c759;
-  --success-bg: rgba(52, 199, 89, 0.12);
-  --danger: #ff3b30;
-  --danger-bg: rgba(255, 59, 48, 0.08);
-  --danger-border: rgba(255, 59, 48, 0.2);
+  --surface-2: #eef3ec;
+  --surface-3: #e3ebdf;
+  --border: rgba(23, 28, 23, 0.08);
+  --text-primary: #171c17;
+  --text-secondary: #3d4a3e;
+  --text-muted: #7d8b7e;
+  /* Fill is the mark's green. --on-signal is the black that sits on it.
+     --signal-ink is the same green, darkened so it can be text on a light
+     page. Change --signal and the tint, ring, and ink follow. */
+  --signal: #45c740;
+  --on-signal: #171c17;
+  --signal-ink: color-mix(in srgb, var(--signal) 38%, var(--on-signal));
+  --signal-soft: color-mix(in srgb, var(--signal) 14%, var(--surface));
+  --on-signal-soft: var(--signal-ink);
+  --accent: var(--signal);
+  --accent-ring: color-mix(in srgb, var(--signal) 28%, transparent);
+  --shadow-signal: 0 10px 24px -14px color-mix(in srgb, var(--signal) 80%, transparent);
+  --success: #12a150;
+  --success-bg: color-mix(in srgb, var(--success) 12%, transparent);
+  --danger: #e5484d;
+  --danger-bg: color-mix(in srgb, var(--danger) 10%, transparent);
+  --danger-border: color-mix(in srgb, var(--danger) 22%, transparent);
   --sidebar-width: 15rem;
+  --ink: #171c17;
+  --on-ink: #ffffff;
+  --shadow-rest: 0 1px 2px color-mix(in srgb, var(--ink) 6%, transparent);
+  --shadow-card: 0 16px 40px -28px color-mix(in srgb, var(--ink) 45%, transparent);
+  --shadow-float: 0 16px 40px -20px color-mix(in srgb, var(--ink) 55%, transparent);
+  --chrome: #171c17;
+  --chrome-text: #ffffff;
+  --chrome-muted: rgba(255, 255, 255, 0.62);
+  --chrome-line: rgba(255, 255, 255, 0.1);
+  --chart-discovered: #c5cad6;
+  --chart-scored: var(--signal);
+  --chart-tailored: #f7a8c4;
+  --chart-applied: var(--success);
+  --chart-interviewing: #f3c48b;
+  --chart-rejected: var(--danger);
+  --chart-offer: #7c6cf0;
+  --chart-ignored: #aeb4c4;
+  --tier-faang: #a855f7;
+  --tier-faang-bg: color-mix(in srgb, var(--tier-faang) 12%, transparent);
+  --tier-known: #d97706;
+  --tier-known-bg: color-mix(in srgb, var(--tier-known) 12%, transparent);
+  --tier-unknown: #64748b;
+  --tier-unknown-bg: color-mix(in srgb, var(--tier-unknown) 12%, transparent);
 }
 
 .dark {
-  --bg: #000000;
-  --surface: #1c1c1e;
-  --surface-2: #2c2c2e;
-  --surface-3: #3a3a3c;
-  --border: rgba(255, 255, 255, 0.1);
-  --text-primary: #f5f5f7;
-  --text-secondary: #a1a1a6;
-  --text-muted: #6e6e73;
-  --accent: #0a84ff;
-  --accent-ring: rgba(10, 132, 255, 0.25);
-  --success-bg: rgba(52, 199, 89, 0.15);
-  --danger-bg: rgba(255, 59, 48, 0.12);
-  --danger-border: rgba(255, 59, 48, 0.25);
+  --bg: #101410;
+  --surface: #171c17;
+  --surface-2: #1e261f;
+  --surface-3: #2a342c;
+  --border: rgba(255, 255, 255, 0.08);
+  --text-primary: #f5f7fb;
+  --text-secondary: #c5cad8;
+  --text-muted: #8b93a7;
+  --signal-ink: var(--signal);
+  --success: #3ddc84;
+  --danger: #ff6b73;
+  --chrome: #0c100c;
 }
 
 * {
@@ -49,14 +80,28 @@ html {
 
 body {
   min-height: 100vh;
-  background: var(--bg);
+  background-color: var(--bg);
+  background-image:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.35), transparent 320px),
+    repeating-linear-gradient(
+      90deg,
+      transparent,
+      transparent 71px,
+      rgba(255, 255, 255, 0.7) 71px,
+      rgba(255, 255, 255, 0.7) 72px
+    ),
+    radial-gradient(920px 560px at 100% -8%, color-mix(in srgb, var(--signal) 16%, white), transparent 62%);
   color: var(--text-primary);
-  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
+  font-family: 'Plus Jakarta Sans', 'Segoe UI', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   /* No horizontal scroll, whatever a child tries to do. Wide content that
      genuinely needs it (the jobs table) scrolls inside its own container. */
   overflow-x: hidden;
+}
+
+html.dark body {
+  background-image: radial-gradient(720px 420px at 100% -10%, color-mix(in srgb, var(--signal) 18%, transparent), transparent 60%);
 }
 
 /* iOS zooms the page in when a focused input's text is under 16px, and never
@@ -80,7 +125,76 @@ body {
 }
 
 ::selection {
-  background: var(--accent-ring);
+  background: var(--signal);
+  color: var(--on-signal);
+}
+
+@layer components {
+  /* Fill and label together, so a new --signal cannot ship with the wrong text. */
+  .bg-signal {
+    background-color: var(--signal);
+    color: var(--on-signal);
+  }
+
+  .bg-signal-soft {
+    background-color: var(--signal-soft);
+    color: var(--on-signal-soft);
+  }
+
+  /* Apple liquid glass. Sticky and fixed parents are already positioning
+     contexts, so this does not set position and cannot knock them off. */
+  .liquid-glass {
+    isolation: isolate;
+    background: color-mix(in srgb, var(--surface) 62%, transparent);
+    -webkit-backdrop-filter: blur(28px) saturate(180%);
+    backdrop-filter: blur(28px) saturate(180%);
+    border: 1px solid color-mix(in srgb, white 70%, transparent);
+    box-shadow:
+      inset 0 1px 0 color-mix(in srgb, white 85%, transparent),
+      inset 0 -1px 0 color-mix(in srgb, var(--ink) 8%, transparent),
+      var(--shadow-float);
+    color: var(--text-primary);
+    --glass-hover: color-mix(in srgb, var(--ink) 6%, transparent);
+  }
+
+  .liquid-glass::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, white 55%, transparent),
+      transparent 46%
+    );
+  }
+
+  .liquid-glass > * {
+    position: relative;
+    z-index: 1;
+  }
+}
+
+.dark .liquid-glass {
+  background: color-mix(in srgb, var(--surface) 48%, transparent);
+  border-color: color-mix(in srgb, white 16%, transparent);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, white 22%, transparent),
+    inset 0 -1px 0 color-mix(in srgb, black 35%, transparent),
+    var(--shadow-float);
+}
+
+input[type='checkbox'] {
+  accent-color: var(--accent);
+}
+
+.page-title {
+  font-family: 'Plus Jakarta Sans', 'Segoe UI', sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 1.05;
 }
 
 @layer utilities {
@@ -107,7 +221,7 @@ body {
 
   /* Clears the mobile tab bar, plus the iPhone home indicator under it. */
   .pb-nav {
-    padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+    padding-bottom: calc(6.5rem + env(safe-area-inset-bottom, 0px));
   }
 
   @media (min-width: 1024px) {
@@ -128,8 +242,8 @@ body {
   }
 
   .glass {
-    background: color-mix(in srgb, var(--surface) 80%, transparent);
-    backdrop-filter: blur(20px) saturate(180%);
-    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    background: color-mix(in srgb, var(--bg) 86%, transparent);
+    backdrop-filter: blur(16px) saturate(140%);
+    -webkit-backdrop-filter: blur(16px) saturate(140%);
   }
 }

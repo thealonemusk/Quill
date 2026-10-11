@@ -12,6 +12,7 @@ from __future__ import annotations
 import base64
 import mimetypes
 import re
+import threading
 import uuid
 from datetime import datetime
 from typing import Dict, List, Optional
@@ -579,6 +580,150 @@ def resume(url: str = "", tab_url: str = "", db: Session = Depends(get_db)):
         "tailored": tailored,
         "job_id": job.id if job else "",
     }
+
+
+# ─── Tailor from the extension ───────────────────────────────────────────────
+#
+# The description comes from the best source there is, in this order:
+#   1. text the user selected on the page — an explicit choice wins;
+#   2. the description the scanner stored for this job;
+#   3. the description container on the page (Greenhouse/Lever/Ashby show it
+#      above the form; Workday on the posting page);
+#   4. one the extension saw earlier in the same tab — Workday's application
+#      steps show no description at all, but its posting page did.
+# A page that is not a known job becomes one, so the later Autofill finds the
+# tailored PDF by the same URL lookup it already uses.
+#
+# Tailoring takes one to four minutes on free models and the extension's
+# requests time out in twelve seconds, so POST starts it and GET reports it.
+
+MIN_JD_CHARS = 300
+MAX_JD_CHARS = 20000
+
+_tailor_lock = threading.Lock()
+_tailor_runs: Dict[str, Dict[str, object]] = {}   # job_id -> status
+_session_factory = None                           # tests point this at a throwaway DB
+
+
+def _new_session():
+    if _session_factory is not None:
+        return _session_factory()
+    from backend.db.models import SessionLocal
+
+    return SessionLocal()
+
+
+class TailorRequest(BaseModel):
+    url: str
+    tab_url: str = ""
+    title: str = ""
+    company: str = ""
+    jd_text: str = ""
+    jd_source: str = ""             # selection | page | remembered
+
+
+def _run_tailor(job_id: str, jd_text: str, title: str, company: str) -> None:
+    from backend.resume import tailor as tailor_mod
+
+    try:
+        res = tailor_mod.tailor(jd_text, job_title=title, company=company, job_id=job_id)
+        report = res.report or {}
+        status = {
+            "state": "done" if res.ok else "failed",
+            "ok": res.ok,
+            "error": res.error,
+            "pages": (report.get("pdf") or {}).get("pages"),
+            "reworded": report.get("model_rewrites", 0),
+            "refused": len(report.get("rejected") or []),
+            "reordered": len(report.get("reordered") or []) + len(report.get("skills_reordered") or []),
+            "notes": str(report.get("notes") or "")[:300],
+        }
+        if res.ok:
+            db = _new_session()
+            try:
+                job = db.get(Job, job_id)
+                # Only an open job moves to "tailored"; the user's own
+                # statuses (applied, rejected, ignored) are left alone.
+                if job and job.status in {"discovered", "scored", "tailored"}:
+                    job.status = "tailored"
+                    db.commit()
+            finally:
+                db.close()
+    except Exception as exc:  # noqa: BLE001 - reported to the extension, not raised
+        status = {"state": "failed", "ok": False, "error": str(exc)[:300]}
+    with _tailor_lock:
+        _tailor_runs[job_id].update(status, finished_at=datetime.utcnow().isoformat())
+
+
+@router.post("/tailor")
+def start_tailor(req: TailorRequest, db: Session = Depends(get_db)):
+    """Start tailoring the resume for the job on this page."""
+    if not re.match(r"^https?://", req.url or "", re.I):
+        raise HTTPException(status_code=400, detail="Tailoring needs a job page URL")
+    with _tailor_lock:
+        busy = next((jid for jid, s in _tailor_runs.items() if s.get("state") == "running"), None)
+    if busy:
+        raise HTTPException(status_code=409, detail="Already tailoring a resume — wait for it to finish")
+
+    page_jd = " ".join((req.jd_text or "").split())[:MAX_JD_CHARS]
+    job = _job_for_page(db, [req.url, req.tab_url])
+    saved = " ".join((job.jd_text or "").split()) if job else ""
+
+    if req.jd_source == "selection" and len(page_jd) >= MIN_JD_CHARS:
+        jd, source = page_jd, "your selection"
+    elif len(saved) >= MIN_JD_CHARS:
+        jd, source = saved, "the saved job description"
+    elif len(page_jd) >= MIN_JD_CHARS:
+        jd, source = page_jd, "this page" if req.jd_source != "remembered" else "the posting page"
+    else:
+        raise HTTPException(
+            status_code=400,
+            detail="No job description found. Select the description text on the page, then press Tailor again.",
+        )
+
+    if job is None:
+        job = Job(
+            id=str(uuid.uuid4()),
+            title=(_clean_title(req.title) or "Untitled role")[:200],
+            company=(req.company or _company_from_url(req.url) or "Unknown")[:200],
+            platform="extension",
+            url=req.url.split("#")[0],
+            location="",
+            jd_text=jd,
+            relevance_score=100.0,
+            fit_reason="Tailored from the browser extension",
+            missing_skills="[]",
+            seniority_level="entry",
+            is_engineering_role=True,
+            status="discovered",
+            ats_type=detect_ats(req.url),
+        )
+        db.add(job)
+    elif len(saved) < MIN_JD_CHARS:
+        job.jd_text = jd                 # keep it for the next tailor and for scoring
+    db.commit()
+
+    with _tailor_lock:
+        _tailor_runs[job.id] = {
+            "state": "running", "job_id": job.id, "source": source,
+            "company": job.company, "started_at": datetime.utcnow().isoformat(),
+        }
+    threading.Thread(
+        target=_run_tailor, args=(job.id, jd, job.title, job.company), daemon=True
+    ).start()
+    return {"job_id": job.id, "state": "running", "source": source, "jd_chars": len(jd)}
+
+
+@router.get("/tailor/{job_id}")
+def tailor_status(job_id: str):
+    """Progress of a tailoring run started from the extension."""
+    with _tailor_lock:
+        status = dict(_tailor_runs.get(job_id) or {})
+    if not status:
+        raise HTTPException(status_code=404, detail="No tailoring run for this job")
+    if status.get("ok"):
+        status["pdf_url"] = f"/api/autopilot/resume/{job_id}"
+    return status
 
 
 @router.post("/track")

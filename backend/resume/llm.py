@@ -7,6 +7,9 @@ Two providers, chosen explicitly by `LLM_PROVIDER` in `config/.env`:
     `OPENAI_BASE_URL` for any OpenAI-compatible server (a gateway, Ollama).
   * `gemini` — `GEMINI_API_KEY` and `GEMINI_MODEL`, sent to Google's
     OpenAI-compatible endpoint, so the same client and JSON mode serve both.
+  * `openrouter` — `OPEN_ROUTER_API_KEY` and `OPENROUTER_MODEL`. The default,
+    `openrouter/free`, routes each call to whichever free model has capacity;
+    on a free key the named free models are often rate-limited upstream.
 
 Explicit rather than "whichever key is set": both keys can be present at once
 (the OpenAI key here authenticates but has no credit), and a run must never be
@@ -33,6 +36,9 @@ DEFAULT_MODEL = "gpt-5.4"
 # gemini-2.x is closed to new keys ("no longer available to new users").
 DEFAULT_GEMINI_MODEL = "gemini-3.6-flash"
 GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai"
+DEFAULT_OPENROUTER_MODEL = "openrouter/free"
+OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+PROVIDERS = {"openai", "gemini", "openrouter"}
 
 MAX_ATTEMPTS = 3                       # per model
 # The free Gemini tier allows 5 requests a minute per model and names the wait
@@ -46,6 +52,7 @@ OVERLOAD_BACKOFF_S = (5, 15)           # 503 "high demand"; no wait is given
 # hour of dead waiting for 30 jobs.
 COOLDOWN_S = 300
 REQUEST_TIMEOUT_S = 60
+MAX_TOKENS_CEILING = 16000
 _down_until: Dict[str, float] = {}
 
 
@@ -64,12 +71,16 @@ def provider() -> str:
 def api_key() -> str:
     if provider() == "gemini":
         return (getattr(settings, "gemini_api_key", "") or "").strip()
+    if provider() == "openrouter":
+        return (getattr(settings, "open_router_api_key", "") or "").strip()
     return (getattr(settings, "gpt_key", "") or "").strip()
 
 
 def model_name() -> str:
     if provider() == "gemini":
         return (getattr(settings, "gemini_model", "") or "").strip() or DEFAULT_GEMINI_MODEL
+    if provider() == "openrouter":
+        return (getattr(settings, "openrouter_model", "") or "").strip() or DEFAULT_OPENROUTER_MODEL
     return (getattr(settings, "openai_model", "") or "").strip() or DEFAULT_MODEL
 
 
@@ -80,6 +91,8 @@ def fallback_model() -> str:
     """
     if provider() == "gemini":
         return (getattr(settings, "gemini_fallback_model", "") or "").strip()
+    if provider() == "openrouter":
+        return (getattr(settings, "openrouter_fallback_model", "") or "").strip()
     return ""
 
 
@@ -87,6 +100,8 @@ def base_url() -> str:
     """Where to send requests. Blank means OpenAI's own endpoint."""
     if provider() == "gemini":
         return GEMINI_BASE_URL
+    if provider() == "openrouter":
+        return OPENROUTER_BASE_URL
     return (getattr(settings, "openai_base_url", "") or "").strip().rstrip("/")
 
 
@@ -96,7 +111,7 @@ def _usable(key: str) -> bool:
 
 
 def is_available() -> bool:
-    if provider() not in {"openai", "gemini"} or not _usable(api_key()):
+    if provider() not in PROVIDERS or not _usable(api_key()):
         return False
     try:
         import openai  # noqa: F401
@@ -108,7 +123,7 @@ def is_available() -> bool:
 def _client():
     key = api_key()
     if not _usable(key):
-        name = "GEMINI_API_KEY" if provider() == "gemini" else "gpt_key"
+        name = {"gemini": "GEMINI_API_KEY", "openrouter": "OPEN_ROUTER_API_KEY"}.get(provider(), "gpt_key")
         raise LLMUnavailable(f"No usable API key. Set {name} in config/.env.")
     try:
         from openai import OpenAI
@@ -186,11 +201,10 @@ def ask_json(
 
     # OpenAI's reasoning models refuse `max_tokens`; several OpenAI-compatible
     # servers (Ollama, Gemini's compatibility layer) only know `max_tokens`.
-    limit = (
-        {"max_tokens": max_tokens} if base_url() else {"max_completion_tokens": max_tokens}
-    )
+    limit_key = "max_tokens" if base_url() else "max_completion_tokens"
 
     for chosen in models:
+        budget = max_tokens
         if _down_until.get(chosen, 0.0) > time.time():
             logger.info(f"Skipping {chosen}: it failed recently and is cooling down")
             continue
@@ -203,11 +217,15 @@ def ask_json(
                         {"role": "user", "content": user},
                     ],
                     response_format={"type": "json_object"},
-                    **limit,
+                    **{limit_key: budget},
                 )
+                # A provider can answer 200 with no choices (an upstream
+                # error body); that used to surface as a bare TypeError.
+                if not getattr(response, "choices", None):
+                    raise ValueError("reply had no choices")
                 choice = response.choices[0]
                 if getattr(choice, "finish_reason", None) == "length":
-                    raise _Truncated(f"reply cut off at max_tokens={max_tokens}")
+                    raise _Truncated(f"reply cut off at max_tokens={budget}")
                 content = (choice.message.content or "").strip()
                 if not content:
                     raise ValueError("empty response")
@@ -220,6 +238,12 @@ def ask_json(
             except Exception as exc:  # noqa: BLE001 - retried, then surfaced
                 last_error = exc
                 wait = _wait_for(exc, attempt)
+                # A reasoning model can spend the whole budget thinking — seen
+                # on openrouter/free. A bigger budget is a different request,
+                # so one retry with double is worth it; the same one is not.
+                if isinstance(exc, _Truncated) and budget < MAX_TOKENS_CEILING:
+                    budget = min(budget * 2, MAX_TOKENS_CEILING)
+                    wait = 0.0
                 final = wait is None or attempt == MAX_ATTEMPTS - 1
                 logger.warning(
                     f"LLM call failed (attempt {attempt + 1}/{MAX_ATTEMPTS}, {provider()}/{chosen}): "

@@ -61,7 +61,7 @@ async def run_unit() -> None:
         page.on("pageerror", lambda e: errors.append(str(e)))
 
         await page.goto((EXT / "test" / "harness.html").as_uri())
-        for name in ("scrape.js", "fill.js"):
+        for name in ("react-bridge.js", "scrape.js", "fill.js"):
             await page.add_script_tag(path=str(EXT / "src" / name))
 
         fields = await page.evaluate("() => { window.__S = window.__TA.scrape(); return window.__S.fields; }")
@@ -171,7 +171,7 @@ async def run_sections() -> None:
         page.on("pageerror", lambda e: errors.append(str(e)))
 
         await page.goto((EXT / "test" / "harness-experience.html").as_uri())
-        for name in ("scrape.js", "fill.js"):
+        for name in ("react-bridge.js", "scrape.js", "fill.js"):
             await page.add_script_tag(path=str(EXT / "src" / name))
 
         before = await page.evaluate("() => window.__TA.scrape().fields.length")
@@ -489,6 +489,7 @@ async def run_enter_commit_and_sections() -> None:
         page = await browser.new_page()
         await page.set_content(ENTER_SKILLS_HTML)
         await page.add_script_tag(path=str(EXT / "src" / "scrape.js"))
+        await page.add_script_tag(path=str(EXT / "src" / "react-bridge.js"))
         await page.add_script_tag(path=str(EXT / "src" / "fill.js"))
 
         # Section scoping: the same page, three different answers.
@@ -615,6 +616,7 @@ async def run_async_prompt() -> None:
         page.on("pageerror", lambda e: errors.append(str(e)))
         await page.set_content(ASYNC_PROMPT_HTML)
         await page.add_script_tag(path=str(EXT / "src" / "scrape.js"))
+        await page.add_script_tag(path=str(EXT / "src" / "react-bridge.js"))
         await page.add_script_tag(path=str(EXT / "src" / "fill.js"))
 
         out = await page.evaluate(
@@ -800,6 +802,7 @@ async def run_workday_react_widgets() -> None:
         page.on("pageerror", lambda e: errors.append(str(e)))
         await page.set_content(WORKDAY_REACT_HTML)
         await page.add_script_tag(path=str(EXT / "src" / "scrape.js"))
+        await page.add_script_tag(path=str(EXT / "src" / "react-bridge.js"))
         await page.add_script_tag(path=str(EXT / "src" / "fill.js"))
 
         out = await page.evaluate(
@@ -1028,6 +1031,7 @@ async def run_chip_count() -> None:
         page = await browser.new_page()
         await page.set_content(html)
         await page.add_script_tag(path=str(EXT / "src" / "scrape.js"))
+        await page.add_script_tag(path=str(EXT / "src" / "react-bridge.js"))
         await page.add_script_tag(path=str(EXT / "src" / "fill.js"))
         counts = await page.evaluate(
             """() => ({
@@ -1055,6 +1059,7 @@ async def run_option_matching() -> None:
         async def load(html):
             await page.set_content(html)
             await page.add_script_tag(path=str(EXT / "src" / "scrape.js"))
+            await page.add_script_tag(path=str(EXT / "src" / "react-bridge.js"))
             await page.add_script_tag(path=str(EXT / "src" / "fill.js"))
 
         await load(SPONSOR_LISTBOX_HTML)
@@ -1211,6 +1216,7 @@ async def run_workday_prompt_evidence() -> None:
         page.on("pageerror", lambda e: errors.append(str(e)))
         await page.set_content(WORKDAY_PROMPT_EVIDENCE_HTML)
         await page.add_script_tag(path=str(EXT / "src" / "scrape.js"))
+        await page.add_script_tag(path=str(EXT / "src" / "react-bridge.js"))
         await page.add_script_tag(path=str(EXT / "src" / "fill.js"))
 
         run = """async ([mode, rows, decoy, value]) => {
@@ -1300,6 +1306,7 @@ async def run_react_state() -> None:
         page.on("pageerror", lambda e: errors.append(str(e)))
         await page.set_content(REACT_STATE_HTML)
         await page.add_script_tag(path=str(EXT / "src" / "scrape.js"))
+        await page.add_script_tag(path=str(EXT / "src" / "react-bridge.js"))
         await page.add_script_tag(path=str(EXT / "src" / "fill.js"))
 
         out = await page.evaluate(
@@ -1441,6 +1448,9 @@ CHROME_STUB_JS = """
       return new Promise(function (r) { setTimeout(function () { r(window.__resolveReply); }, window.__resolveDelay); });
     }
     if (msg.type === 'ping') return { ok: true, data: { name: 'Test', ready: true, has_resume: true, missing: [] } };
+    // Per-type replies a test sets: a value, or a function of the message.
+    var custom = window.__replies && window.__replies[msg.type];
+    if (custom) return typeof custom === 'function' ? custom(msg) : custom;
     return { ok: true };
   }
   window.chrome = { runtime: {
@@ -1472,7 +1482,7 @@ CONTENT_FORM_HTML = """
 
 async def _load_content(frame) -> None:
     await frame.add_script_tag(content=CHROME_STUB_JS)
-    for name in ("scrape.js", "fill.js", "widget.js", "content.js"):
+    for name in ("react-bridge.js", "scrape.js", "fill.js", "widget.js", "content.js"):
         await frame.add_script_tag(path=str(EXT / "src" / name))
 
 
@@ -1522,6 +1532,116 @@ async def run_widget_lifecycle() -> None:
         check("show after close rebuilds", out["reopened"], True)
         check("rebuilt panel is wired once", out["total"], 2)
         check("one panel on the page", out["hosts"], 1)
+        await browser.close()
+
+
+JD_TEXT = "We are looking for a backend engineer to build distributed payment systems. " * 6
+WORKDAY_POSTING_HTML = f"""
+<!doctype html><meta charset="utf-8"><title>Backend Engineer</title><body>
+  <div data-automation-id="jobPostingDescription"><p>{JD_TEXT}</p></div>
+  {CONTENT_FORM_HTML.split('<body>')[1].split('</body>')[0]}
+</body>"""
+GENERIC_MAIN_HTML = f"""
+<!doctype html><body><main><p>{"Application form instructions and field help. " * 10}</p></main></body>"""
+
+
+async def run_tailor_button() -> None:
+    """Tailor resume: where the description comes from, and what the panel says."""
+    from playwright.async_api import async_playwright
+
+    print("\nTailor resume — finding the description, starting and polling a run")
+    shadow = "document.getElementById('tempoapply-widget-host').shadowRoot"
+
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True)
+        page = await browser.new_page()
+        errors: list[str] = []
+        page.on("pageerror", lambda e: errors.append(str(e)))
+
+        # ── Finding the description ──
+        await page.set_content(WORKDAY_POSTING_HTML)
+        await page.add_script_tag(path=str(EXT / "src" / "scrape.js"))
+        jd = await page.evaluate("() => window.__TA.jobDescription()")
+        check("Workday posting container found", (jd or {}).get("source"), "page")
+        check("...and it is an ATS container", (jd or {}).get("specific"), True)
+        picked = await page.evaluate(
+            """() => { const r = document.createRange();
+                       r.selectNodeContents(document.querySelector('[data-automation-id="jobPostingDescription"] p'));
+                       const s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+                       return window.__TA.jobDescription(); }"""
+        )
+        check("a selection wins", (picked or {}).get("source"), "selection")
+        await page.set_content(GENERIC_MAIN_HTML)
+        await page.add_script_tag(path=str(EXT / "src" / "scrape.js"))
+        generic = await page.evaluate("() => window.__TA.jobDescription()")
+        check("a generic <main> is not trusted as the JD", (generic or {}).get("specific"), False)
+        await page.set_content("<!doctype html><body><main>Too short.</main></body>")
+        await page.add_script_tag(path=str(EXT / "src" / "scrape.js"))
+        check("too little text is no description", await page.evaluate("() => window.__TA.jobDescription()"), None)
+
+        # ── The run, on a posting page with a form below ──
+        await page.set_content(WORKDAY_POSTING_HTML)
+        await _load_content(page)
+        await page.evaluate(
+            """() => {
+                 window.__TA.tailorPollMs = 50;
+                 let polls = 0;
+                 window.__replies = {
+                   tailor: { ok: true, data: { job_id: 'job-1234abcd', state: 'running', source: 'this page' } },
+                   tailorStatus: () => (++polls < 3)
+                     ? { ok: true, data: { state: 'running' } }
+                     : { ok: true, data: { state: 'done', ok: true, reworded: 3, refused: 1, pages: 1,
+                                            pdf_url: 'http://localhost:8000/api/autopilot/resume/job-1234abcd' } },
+                 };
+               }"""
+        )
+        await page.wait_for_timeout(1300)            # watch() -> remember + mount
+        check("the posting's JD is remembered for later steps", await page.evaluate("() => window.__count('rememberJd')"), 1)
+        await page.evaluate(f"() => {shadow}.querySelector('[data-tailor]').click()")
+        await page.wait_for_timeout(900)
+        out = await page.evaluate(
+            f"""() => {{
+                 const sent = window.__sent.find((m) => m.type === 'tailor');
+                 const m = {shadow}.querySelector('[data-msg]');
+                 const a = m.querySelector('a');
+                 return {{ source: sent && sent.payload.jd_source, chars: sent ? sent.payload.jd_text.length : 0,
+                           text: m.textContent, href: a && a.getAttribute('href'),
+                           button: {shadow}.querySelector('[data-tailor]').disabled }};
+               }}"""
+        )
+        check("the page's JD is sent", out["source"], "page")
+        check("...in full", out["chars"] >= 300, True)
+        check("the panel reports the result", "3 line(s) reworded, 1 refused" in out["text"], True)
+        check("...with a link to the PDF", out["href"], "http://localhost:8000/api/autopilot/resume/job-1234abcd")
+        check("the button is usable again", out["button"], False)
+
+        # ── A form step with no description: the remembered one is used ──
+        await page.set_content(CONTENT_FORM_HTML)
+        await _load_content(page)
+        await page.evaluate(
+            f"""() => {{
+                 window.__TA.tailorPollMs = 50;
+                 window.__replies = {{
+                   recallJd: {{ ok: true, data: {{ text: {JD_TEXT!r} }} }},
+                   tailor: {{ ok: false, error: '<img src=x onerror="window.__xss=1">' }},
+                 }};
+               }}"""
+        )
+        await page.wait_for_timeout(1300)
+        await page.evaluate(f"() => {shadow}.querySelector('[data-tailor]').click()")
+        await page.wait_for_timeout(400)
+        out = await page.evaluate(
+            f"""() => {{
+                 const sent = window.__sent.find((m) => m.type === 'tailor');
+                 const m = {shadow}.querySelector('[data-msg]');
+                 return {{ source: sent && sent.payload.jd_source, imgs: m.querySelectorAll('img').length,
+                           xss: !!window.__xss, text: m.textContent }};
+               }}"""
+        )
+        check("no JD on the step -> the remembered one", out["source"], "remembered")
+        check("a backend error is shown", "Could not tailor" in out["text"], True)
+        check("...as text, not markup", (out["imgs"], out["xss"]), (0, False))
+        check("no page errors", errors, [])
         await browser.close()
 
 
@@ -1685,6 +1805,76 @@ def _serve(directory: Path):
     return httpd
 
 
+# Every other suite injects fill.js with a <script> tag, which puts it in the
+# page's JS world, where Workday's `__reactProps$…` keys are visible. The real
+# content script runs in an isolated world and cannot see them, so the React
+# commit path passed here for weeks and never ran on a live tenant. This runs
+# the same fixture through the unpacked extension and evaluates inside the
+# content script's own world.
+_ISOLATED_PROBE = """(async () => {
+  const input = document.querySelector('[data-automation-id="multiSelectContainer"] input');
+  const TA = window.__TA;
+  if (!TA) return { hasTA: false };
+  const { fields, elements } = TA.scrape();
+  const skills = fields.find(f => (f.label || '').toLowerCase().includes('skill'));
+  const res = await TA.applyFills([{ idx: skills.idx, action: 'multiselect', value: 'Java',
+      values: ['Java', 'Python'], label: 'Skills' }], elements, null);
+  return {
+    hasTA: true,
+    seesReactKeys: Object.keys(input).some(k => k.startsWith('__react')),
+    chips: Array.from(document.querySelectorAll(
+      '[data-automation-id="selectedItemList"] > li')).map(li => li.textContent),
+    applied: res.applied.length,
+  };
+})()"""
+
+
+async def run_real_extension_worlds() -> None:
+    from playwright.async_api import async_playwright
+
+    print("\nIntegration — real extension, Workday prompt from the isolated world")
+    serve_dir = Path(tempfile.mkdtemp(prefix="ta-iso-"))
+    (serve_dir / "wd.html").write_text(WORKDAY_REACT_HTML, encoding="utf-8")
+    # Its own ephemeral port, so it never contends with PORT for the suite
+    # after it (Windows refuses a rebind while the old one sits in TIME_WAIT).
+    handler = functools.partial(http.server.SimpleHTTPRequestHandler, directory=str(serve_dir))
+    httpd = socketserver.TCPServer(("127.0.0.1", 0), handler)
+    port = httpd.server_address[1]
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    async with async_playwright() as p:
+        ctx = await p.chromium.launch_persistent_context(
+            user_data_dir=tempfile.mkdtemp(prefix="ta-chrome-"),
+            headless=False,  # the bundled headless shell does not load extensions
+            args=[f"--disable-extensions-except={EXT}", f"--load-extension={EXT}",
+                  "--no-first-run", "--no-default-browser-check"],
+        )
+        try:
+            page = ctx.pages[0] if ctx.pages else await ctx.new_page()
+            cdp = await ctx.new_cdp_session(page)
+            contexts: list[dict] = []
+            cdp.on("Runtime.executionContextCreated", lambda e: contexts.append(e["context"]))
+            await cdp.send("Runtime.enable")
+            await page.goto(f"http://127.0.0.1:{port}/wd.html")
+            await page.wait_for_timeout(2500)
+            ours = [c for c in contexts
+                    if c.get("auxData", {}).get("type") == "isolated" and "TempoApply" in c.get("name", "")]
+            check("content script world found", bool(ours), True)
+            if not ours:
+                return
+            r = await cdp.send("Runtime.evaluate", {"expression": _ISOLATED_PROBE, "contextId": ours[-1]["id"],
+                                                    "awaitPromise": True, "returnByValue": True})
+            out = r.get("result", {}).get("value") or {}
+            check("fill.js loaded", out.get("hasTA"), True)
+            # The premise: if this ever reads True the probe is in the wrong world.
+            check("React keys invisible here", out.get("seesReactKeys"), False)
+            check("skills committed", out.get("chips"), ["Java", "Python"])
+            check("skills applied", out.get("applied"), 1)
+        finally:
+            await ctx.close()
+            httpd.shutdown()
+            httpd.server_close()
+
+
 async def run_integration() -> None:
     import urllib.error
     import urllib.request
@@ -1808,7 +1998,9 @@ async def main() -> None:
     await run_nameless_radios()
     await run_widget_lifecycle()
     await run_content_orchestration()
+    await run_tailor_button()
     if "--integration" in sys.argv:
+        await run_real_extension_worlds()
         await run_integration()
 
     print()

@@ -49,7 +49,7 @@ export function JobCard({
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.02, duration: 0.2 }}
       className={clsx(
-        'rounded-2xl border bg-[var(--surface)] p-3.5 shadow-sm transition-colors',
+        'rounded-2xl border bg-[var(--surface)] p-3.5 shadow-[var(--shadow-card)] transition-colors',
         visited
           ? 'border-[var(--border)] bg-[var(--surface-2)]/50'
           : 'border-[var(--border)]',
@@ -129,7 +129,7 @@ export function JobCard({
               'inline-flex h-10 items-center justify-center gap-1.5 rounded-xl border px-3 text-[13px] font-medium transition-colors',
               visited
                 ? 'border-[var(--border)] bg-[var(--surface-2)] text-[var(--text-secondary)]'
-                : 'border-transparent bg-[var(--accent)] text-white active:opacity-90',
+                : 'bg-signal border-transparent active:brightness-110',
             )}
           >
             <ExternalLink className="h-4 w-4" />
@@ -176,7 +176,7 @@ export function JobRow({
           <div className="flex items-center gap-2">
             <p
               className={clsx(
-                'truncate text-sm font-medium',
+                'truncate text-sm font-semibold',
                 visited ? 'text-[var(--text-muted)]' : 'text-[var(--text-primary)]',
               )}
             >
@@ -219,7 +219,7 @@ export function JobRow({
                 ? 'text-[var(--success)]'
                 : applyBusy
                   ? 'text-[var(--text-muted)] opacity-40'
-                  : 'text-[var(--text-muted)] hover:bg-[var(--surface-3)] hover:text-[var(--accent)] lg:opacity-0 lg:group-hover:opacity-100',
+                  : 'text-[var(--text-muted)] hover:bg-[var(--surface-3)] hover:text-[var(--signal-ink)] lg:opacity-0 lg:group-hover:opacity-100',
             )}
           >
             <Send className="h-4 w-4" />
@@ -234,8 +234,8 @@ export function JobRow({
               visited
                 ? 'text-[var(--success)] opacity-100'
                 : alwaysShowOpen
-                  ? 'text-[var(--accent)] opacity-100 hover:bg-[var(--surface-3)]'
-                  : 'text-[var(--text-muted)] hover:bg-[var(--surface-3)] hover:text-[var(--accent)] lg:opacity-0 lg:group-hover:opacity-100',
+                  ? 'text-[var(--signal-ink)] opacity-100 hover:bg-[var(--surface-3)]'
+                  : 'text-[var(--text-muted)] hover:bg-[var(--surface-3)] hover:text-[var(--signal-ink)] lg:opacity-0 lg:group-hover:opacity-100',
             )}
             title={alwaysShowOpen ? 'Open and fill manually' : visited ? 'Already visited' : 'Open posting'}
           >

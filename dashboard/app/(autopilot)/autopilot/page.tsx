@@ -131,8 +131,8 @@ export default function AutopilotPage() {
     <div className="page-x mx-auto max-w-6xl space-y-5 pb-16 pt-5 sm:pt-6">
       {/* running banner */}
       {status?.running && (
-        <div className="flex items-center gap-3 rounded-2xl border border-[var(--accent)] bg-[var(--surface)] px-5 py-3.5">
-          <Loader2 className="h-4 w-4 shrink-0 animate-spin text-[var(--accent)]" />
+        <div className="flex items-center gap-3 rounded-xl border border-[var(--accent)] bg-[var(--surface)] px-5 py-3.5">
+          <Loader2 className="h-4 w-4 shrink-0 animate-spin text-[var(--signal-ink)]" />
           <div className="flex-1 text-sm">
             <span className="font-medium text-[var(--text-primary)] capitalize">{status.stage}</span>
             {status.total > 0 && (
@@ -157,10 +157,10 @@ export default function AutopilotPage() {
             key={key}
             onClick={() => setTab(key)}
             className={clsx(
-              'rounded-full px-4 py-1.5 text-sm font-medium transition-colors',
+              'rounded-full px-4 py-1.5 text-sm font-semibold transition-colors',
               tab === key
-                ? 'bg-[var(--accent)] text-white'
-                : 'bg-[var(--surface-2)] text-[var(--text-secondary)] hover:bg-[var(--surface-3)]',
+                ? 'bg-[var(--ink)] text-[var(--on-ink)]'
+                : 'bg-[var(--surface)] text-[var(--text-secondary)] shadow-[var(--shadow-rest)] ring-1 ring-[var(--border)] hover:ring-[var(--text-primary)]',
             )}
           >
             {key === 'select' ? 'Select' : `Review${queue.length ? ` (${queue.length})` : ''}`}
@@ -409,7 +409,7 @@ function CandidateRow({
   return (
     <div
       className={clsx(
-        'flex items-start gap-3 rounded-2xl border px-4 py-3 transition-colors',
+        'flex items-start gap-3 rounded-xl border px-4 py-3 transition-colors',
         checked ? 'border-[var(--accent)] bg-[var(--surface)]' : 'border-[var(--border)]',
         manual && 'opacity-70',
       )}
@@ -472,7 +472,7 @@ function QueueRow({
 }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3">
+    <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3">
       <div className="flex flex-wrap items-center gap-3">
         <div className="min-w-0 flex-1">
           <p className="font-medium text-[var(--text-primary)]">

@@ -590,6 +590,97 @@
     }
   }
 
+  // ── Tailor the resume to this job ──────────────────────────────────────────
+  //
+  // The description, best source first: text the user selected; the ATS's own
+  // description container; one remembered from the posting page earlier in
+  // this tab (Workday's form steps show none); a generic container last. The
+  // backend prefers the description the scanner saved, when the job is known.
+  const TAILOR_POLL_MS = 3000;
+  const TAILOR_MAX_MS = 8 * 60 * 1000;
+  let rememberedLength = 0;
+
+  /** Keep the description a posting page shows, for the steps that do not. */
+  function rememberDescription() {
+    if (!isTop || !TA.jobDescription) return;
+    const jd = TA.jobDescription();
+    // Only an ATS's own description container: a generic `main` on a form
+    // step is the form, and must not overwrite the real description.
+    if (!jd || jd.source !== "page" || !jd.specific) return;
+    if (jd.text.length <= rememberedLength) return;
+    rememberedLength = jd.text.length;
+    send({ type: "rememberJd", jd: { text: jd.text } });
+  }
+
+  async function findDescription() {
+    let jd = TA.jobDescription ? TA.jobDescription() : null;
+    if (jd && jd.specific) return jd;
+    const recalled = await send({ type: "recallJd" });
+    if (recalled.ok && recalled.data && recalled.data.text) {
+      return { text: recalled.data.text, source: "remembered", specific: true };
+    }
+    return jd; // a generic container, or nothing — the backend may still have one saved
+  }
+
+  async function tailorResume() {
+    if (state.tailoring) return;
+    state.tailoring = true;
+    TA.widget.setTailoring(true);
+    try {
+      const jd = await findDescription();
+      const resolved = state.lastResolve;
+      const start = await send({
+        type: "tailor",
+        payload: {
+          url: location.href,
+          title: (resolved && resolved.job_title) || document.title,
+          company: (resolved && resolved.company) || "",
+          jd_text: jd ? jd.text : "",
+          jd_source: jd ? jd.source : "",
+        },
+      });
+      if (!start.ok) {
+        TA.widget.message(`Could not tailor: ${esc(start.error)}`, "err");
+        return;
+      }
+      TA.widget.message(
+        `Tailoring your resume from ${esc(start.data.source)}… this takes one to four minutes.`,
+        "info"
+      );
+      const began = Date.now();
+      while (Date.now() - began < TAILOR_MAX_MS) {
+        await new Promise((r) => setTimeout(r, TA.tailorPollMs || TAILOR_POLL_MS));
+        const s = await send({ type: "tailorStatus", jobId: start.data.job_id });
+        if (!s.ok) {
+          TA.widget.message(`Lost track of the tailoring run: ${esc(s.error)}`, "err");
+          return;
+        }
+        if (s.data.state === "running") {
+          TA.widget.setTailoring(true, `Tailoring… ${Math.round((Date.now() - began) / 1000)}s`);
+          continue;
+        }
+        if (!s.data.ok) {
+          TA.widget.message(`Tailoring failed: ${esc(s.data.error)} Your default resume will be used.`, "err");
+          return;
+        }
+        const reworded = s.data.reworded
+          ? `${s.data.reworded} line(s) reworded${s.data.refused ? `, ${s.data.refused} refused by the fact check` : ""}`
+          : "reordered for this job, not reworded (the model was unavailable)";
+        TA.widget.message(
+          `Tailored resume ready — ${esc(reworded)}. ` +
+            `<a href="${esc(s.data.pdf_url)}" target="_blank" rel="noopener">View PDF</a><br>` +
+            "Autofill will attach it.",
+          "info"
+        );
+        return;
+      }
+      TA.widget.message("Still tailoring after 8 minutes — check the dashboard's review queue.", "err");
+    } finally {
+      state.tailoring = false;
+      TA.widget.setTailoring(false);
+    }
+  }
+
   /**
    * Click a portal's own gate button (Workday's "Apply Manually" / "Apply"),
    * then wait for the form it opens and refresh the panel. Never touches a
@@ -659,6 +750,7 @@
       onFillSection: pickAndFill,
       onRefill: () => runAll({ overwrite: true }),
       onApplied: markApplied,
+      onTailor: tailorResume,
       onTodoClick: focusTodo,
       onAction: clickThrough,
       onClose: () => {
@@ -702,6 +794,7 @@
       clearTimeout(timer);
       timer = setTimeout(() => {
         if (isTop) {
+          rememberDescription();
           mountWidget(false);
           // Workday renders its chooser well after the widget mounts, and
           // swaps the whole page on every wizard step — so the stage has to be
@@ -725,6 +818,7 @@
       if (location.href !== href) {
         href = location.href;
         announced = false;
+        rememberedLength = 0;     // a new page may be a new posting
         TA.clearMarks();
         check();
       }

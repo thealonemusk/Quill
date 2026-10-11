@@ -274,20 +274,40 @@ export default function JobsPage() {
 
   return (
     <>
-      <header className="page-x glass sticky top-0 z-20 border-b border-[var(--border)] py-4 sm:py-5">
-        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
-          <div className="min-w-0">
-            <h1 className="text-xl font-semibold tracking-tight text-[var(--text-primary)] sm:text-2xl">
-              Jobs
-            </h1>
-            <p className="mt-0.5 text-sm text-[var(--text-muted)]">
-              {jobs.length} total
-              {pendingCount > 0 && ` · ${pendingCount} pending`}
-              {visitedCount > 0 && ` · ${visitedCount} visited`}
-              {manualJobs.length > 0 && ` · ${manualJobs.length} need manual apply`}
-              {scanning && ' · scanning…'}
-              {applying && ' · applying…'}
-            </p>
+      <header className="page-x glass sticky top-0 z-20 py-4 sm:py-5">
+        <div className="flex min-w-0 flex-wrap items-end justify-between gap-x-4 gap-y-3">
+          <div className="min-w-0 max-w-full">
+            <h1 className="page-title text-4xl text-[var(--text-primary)] sm:text-5xl">Jobs</h1>
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              <span className="bg-signal rounded-full px-2.5 py-1 text-xs font-semibold">
+                {jobs.length} total
+              </span>
+              {pendingCount > 0 && (
+                <span className="rounded-full border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1 text-xs font-medium text-[var(--text-secondary)]">
+                  {pendingCount} pending
+                </span>
+              )}
+              {visitedCount > 0 && (
+                <span className="rounded-full border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1 text-xs font-medium text-[var(--text-muted)]">
+                  {visitedCount} visited
+                </span>
+              )}
+              {manualJobs.length > 0 && (
+                <span className="rounded-full border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1 text-xs font-medium text-[var(--text-secondary)]">
+                  {manualJobs.length} manual
+                </span>
+              )}
+              {scanning && (
+                <span className="bg-signal rounded-full px-2.5 py-1 text-xs font-semibold">
+                  Scanning
+                </span>
+              )}
+              {applying && (
+                <span className="rounded-full bg-[var(--ink)] px-2.5 py-1 text-xs font-semibold text-[var(--on-ink)]">
+                  Applying
+                </span>
+              )}
+            </div>
           </div>
           <ScanBar
             scanning={scanning}
@@ -353,7 +373,7 @@ export default function JobsPage() {
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as 'score' | 'date')}
-              className="min-w-0 flex-1 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-sm text-[var(--text-secondary)] outline-none sm:flex-none"
+              className="min-w-0 flex-1 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-sm text-[var(--text-secondary)] shadow-[var(--shadow-rest)] outline-none focus:border-[var(--accent)] sm:flex-none"
             >
               <option value="score">Best match</option>
               <option value="date">Date</option>
@@ -361,7 +381,7 @@ export default function JobsPage() {
             <select
               value={sortOrder}
               onChange={(e) => setSortOrder(e.target.value as 'desc' | 'asc')}
-              className="min-w-0 flex-1 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-sm text-[var(--text-secondary)] outline-none sm:flex-none"
+              className="min-w-0 flex-1 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-sm text-[var(--text-secondary)] shadow-[var(--shadow-rest)] outline-none focus:border-[var(--accent)] sm:flex-none"
             >
               <option value="desc">{sortBy === 'score' ? 'Highest score' : 'Newest'}</option>
               <option value="asc">{sortBy === 'score' ? 'Lowest score' : 'Oldest'}</option>
@@ -373,10 +393,10 @@ export default function JobsPage() {
               type="button"
               onClick={() => setFilterPlatform('')}
               className={clsx(
-                'shrink-0 whitespace-nowrap rounded-full px-3.5 py-2 text-xs font-medium transition-colors sm:px-3 sm:py-1.5',
+                'shrink-0 whitespace-nowrap rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors',
                 !filterPlatform
-                  ? 'bg-[var(--text-primary)] text-[var(--bg)]'
-                  : 'bg-[var(--surface-2)] text-[var(--text-secondary)] hover:bg-[var(--surface-3)]',
+                  ? 'bg-[var(--ink)] text-[var(--on-ink)]'
+                  : 'bg-[var(--surface)] text-[var(--text-secondary)] shadow-[var(--shadow-rest)] ring-1 ring-[var(--border)] hover:ring-[var(--text-primary)]',
               )}
             >
               All
@@ -387,10 +407,10 @@ export default function JobsPage() {
                 type="button"
                 onClick={() => setFilterPlatform(p)}
                 className={clsx(
-                  'shrink-0 whitespace-nowrap rounded-full px-3.5 py-2 text-xs font-medium transition-colors sm:px-3 sm:py-1.5',
+                  'shrink-0 whitespace-nowrap rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors',
                   filterPlatform === p
-                    ? 'bg-[var(--text-primary)] text-[var(--bg)]'
-                    : 'bg-[var(--surface-2)] text-[var(--text-secondary)] hover:bg-[var(--surface-3)]',
+                    ? 'bg-[var(--ink)] text-[var(--on-ink)]'
+                    : 'bg-[var(--surface)] text-[var(--text-secondary)] shadow-[var(--shadow-rest)] ring-1 ring-[var(--border)] hover:ring-[var(--text-primary)]',
                 )}
               >
                 {platformLabel(p)}
@@ -398,15 +418,15 @@ export default function JobsPage() {
             ))}
           </div>
 
-          <div className="md:overflow-hidden md:rounded-2xl md:border md:border-[var(--border)] md:bg-[var(--surface)] md:shadow-sm">
+          <div className="md:overflow-hidden md:rounded-2xl md:border md:border-[var(--border)] md:bg-[var(--surface)] md:shadow-[var(--shadow-card)]">
             {loading ? (
-              <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-10 text-center text-sm text-[var(--text-muted)] md:rounded-none md:border-0 md:p-16">Loading…</div>
+              <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-10 text-center text-sm text-[var(--text-muted)] md:rounded-none md:border-0 md:p-16">Loading…</div>
             ) : queueJobs.length === 0 && manualJobs.length === 0 ? (
-              <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-10 text-center text-sm text-[var(--text-muted)] md:rounded-none md:border-0 md:p-16">
+              <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-10 text-center text-sm text-[var(--text-muted)] md:rounded-none md:border-0 md:p-16">
                 No jobs yet. Run a scan to discover roles.
               </div>
             ) : queueJobs.length === 0 ? (
-              <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-10 text-center text-sm text-[var(--text-muted)] md:rounded-none md:border-0 md:p-16">
+              <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-10 text-center text-sm text-[var(--text-muted)] md:rounded-none md:border-0 md:p-16">
                 No jobs left in the auto-apply queue. Check Manual apply below.
               </div>
             ) : (
@@ -482,12 +502,12 @@ export default function JobsPage() {
           {!loading && manualJobs.length > 0 && (
             <div className="space-y-3 pt-4">
               <div>
-                <h2 className="text-lg font-semibold text-[var(--text-primary)]">Manual apply</h2>
+                <h2 className="page-title text-2xl text-[var(--text-primary)]">Manual apply</h2>
                 <p className="mt-0.5 text-sm text-[var(--text-muted)]">
                   Auto-fill could not finish these. Open the posting and complete them yourself, or retry apply.
                 </p>
               </div>
-              <div className="md:overflow-hidden md:rounded-2xl md:border md:border-[var(--border)] md:bg-[var(--surface)] md:shadow-sm">
+              <div className="md:overflow-hidden md:rounded-2xl md:border md:border-[var(--border)] md:bg-[var(--surface)] md:shadow-[var(--shadow-card)]">
                 <div className="space-y-2.5 md:hidden">
                   {manualJobs.map((job, i) => (
                     <JobCard

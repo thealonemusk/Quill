@@ -98,7 +98,7 @@
 % ---------- Summary ----------
 \section{Summary}
 \small
-Backend / distributed-systems engineer with production ownership of device-to-cloud payment infrastructure at Paytm. Built and operated fleet infrastructure spanning IoT connectivity, zero-downtime migrations, CI/CD and OTA releases, and production LLM-agent tooling. Strong foundations in Java, C/C++, Python, networking, concurrency, storage systems, databases, and algorithms.
+Backend engineer with production ownership of device-to-cloud payment infrastructure at Paytm: a 6M-device fleet serving 600 TPS of live transactions, including bill payments. Ships Java backend services, zero-downtime migrations, CI/CD and OTA releases, and production LLM-agent tooling; builds LLM inference and agent-evaluation infrastructure (vLLM, goodput benchmarking, agent reliability evals).
 
 % ---------- Experience ----------
 \section{Experience}
@@ -109,15 +109,15 @@ Backend / distributed-systems engineer with production ownership of device-to-cl
     {Software Engineer}{Noida, India}
 
   \begin{itemize}
-    \resumeItem{Owned Indonesia IoT launch end-to-end, moving device connectivity to TLS over HTTPS/MQTTS, validating certificate compatibility, handling regional timezones and transaction formatting; sole production owner for the market and its Java IoT backend services.}
+    \resumeItem{Led zero-downtime migration of 5M deployed devices to new backend hosts/endpoints, staging rollout by hardware family to protect live transaction traffic (600 TPS), including bill payments.}
 
-    \resumeItem{Led migration of the entire deployed device fleet to new backend hosts/endpoints, staging rollout by hardware family while maintaining zero downtime for live transaction traffic.}
+    \resumeItem{Owned Indonesia IoT launch end-to-end across 100K devices: moved connectivity to TLS over HTTPS/MQTTS and validated certificates; sole production owner of its Spring Boot services (Kafka, MySQL, Redis) on AWS IoT Core and EKS.}
 
-    \resumeItem{Owned CI/CD and OTA release path for 18 device types, including Jenkins builds, delta updates, canary rollouts and post-release monitoring; fixed a delta-update failure blocking production distribution.}
+    \resumeItem{Owned CI/CD and OTA releases for 18 device types (Jenkins, delta updates, canary rollouts); fixed a delta-update failure blocking production distribution.}
 
-    \resumeItem{Designed fleet telemetry covering battery, transaction counters, cell ID, keep-alive and free-heap deltas with randomized request timing; fixed a messaging-client memory leak and use-after-free, and reduced 3--8s latency under concurrent downloads.}
+    \resumeItem{Fixed a messaging-client memory leak and use-after-free; reduced 3--8s HTTP download latency on Soundbox devices under concurrent downloads.}
 
-    \resumeItem{Built a Python + Slack LLM-agent orchestration system (\textasciitilde1,500 LOC) routing tickets to autonomous coding agents and production repositories; enabled 45 production changes through automated PR workflows.}
+    \resumeItem{Built a Python + Slack orchestration system routing tickets to autonomous Claude Code agents with MCP tool calling; shipped 45 production changes via automated PR workflows.}
   \end{itemize}
 
   \resumeSubheading
@@ -125,11 +125,7 @@ Backend / distributed-systems engineer with production ownership of device-to-cl
     {Software Developer Intern}{Remote}
 
   \begin{itemize}
-    \resumeItem{Built backend services using AWS Lambda, Cognito and S3 for authentication, API processing and cloud storage.}
-
-    \resumeItem{Improved API response times by 40\% through asynchronous processing and caching.}
-
-    \resumeItem{Developed and integrated REST/JSON APIs while working in an Agile development workflow.}
+    \resumeItem{Built backend services on AWS Lambda, Cognito and S3; improved API response times by 40\% through asynchronous processing and caching.}
   \end{itemize}
 
 \end{itemize}
@@ -139,15 +135,25 @@ Backend / distributed-systems engineer with production ownership of device-to-cl
 \resumeSubHeadingListStart
 
   \resumeProjectHeading
-    {\textbf{\href{https://github.com/thealonemusk/ThrottleX}{\underline{ThrottleX}}} $-$ API Rate Limiting Service}
-    {\textit{Java 17, Spring Boot 3.2, JPA, MySQL, Docker}}
+    {\textbf{InferStack} $-$ LLM Inference Serving \& Capacity Benchmarking}
+    {\textit{Python, vLLM, FastAPI, Prometheus, Grafana, Docker}}
 
   \resumeItemListStart
-    \resumeItem{Built a Spring Boot rate-limiting service supporting Token Bucket and Sliding Window algorithms behind a common \texttt{Limiter} interface.}
+    \resumeItem{Built an open-loop Poisson load harness measuring SLO-bound goodput; sustained 16.5 req/s on one T4 GPU within 1s TTFT / 50ms TPOT SLOs (peak goodput 13.5 req/s).}
 
-    \resumeItem{Implemented transactional MySQL persistence with JPA/Hibernate, pessimistic locking, indexed request logs and per-IP/user/route policies.}
+    \resumeItem{Validated vLLM continuous batching at 7.3x speedup (91\% of theoretical ceiling); OpenAI-compatible FastAPI gateway adds only \textasciitilde7ms to TTFT.}
 
-    \resumeItem{Exposed a 9-endpoint admin API for policy management and packaged the service with Docker.}
+    \resumeItem{Instrumented batch size, queue depth and KV-cache utilization; traced a median TTFT jump from 120ms to 5.1s to compute saturation rather than queueing.}
+  \resumeItemListEnd
+
+  \resumeProjectHeading
+    {\textbf{\href{https://github.com/thealonemusk/DriftBench}{\underline{DriftBench}}} $-$ LLM Coding-Agent Evaluation Harness}
+    {\textit{Python, pytest}}
+
+  \resumeItemListStart
+    \resumeItem{Built a deterministic harness running 30 sequential coding tickets against an evolving codebase, with 14 hidden invariants detecting regressions and state drift.}
+
+    \resumeItem{Measured retrieval recall degradation from 90\% to 25\% in a 2x2 ablation against a sliding-window baseline.}
   \resumeItemListEnd
 
   \resumeProjectHeading
@@ -157,21 +163,7 @@ Backend / distributed-systems engineer with production ownership of device-to-cl
   \resumeItemListStart
     \resumeItem{Built a persistent C key-value storage engine from scratch with a custom 4KB paged binary format and file-backed pager, using no external libraries.}
 
-    \resumeItem{Implemented a B+Tree with node splitting and $O(\log n)$ lookups for indexed key-value access.}
-
-    \resumeItem{Added write-ahead logging for crash recovery, page compaction and unit tests for storage correctness.}
-  \resumeItemListEnd
-
-  \resumeProjectHeading
-    {\textbf{\href{https://github.com/thealonemusk/DriftBench}{\underline{DriftBench}}} $-$ LLM Coding-Agent Evaluation Harness}
-    {\textit{Python, pytest}}
-
-  \resumeItemListStart
-    \resumeItem{Built a deterministic evaluation harness running 30 sequential coding tickets against an evolving codebase to measure agent reliability.}
-
-    \resumeItem{Designed 14 hidden invariants and probes to detect regressions, state drift and incorrect agent behavior.}
-
-    \resumeItem{Measured retrieval recall degradation from 90\% to 25\% in a 2x2 ablation against a sliding-window baseline.}
+    \resumeItem{Implemented a B+Tree with $O(\log n)$ lookups and write-ahead logging for crash recovery, with page compaction and correctness tests.}
   \resumeItemListEnd
 
 \resumeSubHeadingListEnd
@@ -179,12 +171,11 @@ Backend / distributed-systems engineer with production ownership of device-to-cl
 % ---------- Skills ----------
 \section{Technical Skills}
 \small
-\textbf{Languages:} C, C++, Java, Python, SQL, JavaScript/TypeScript \\
-\textbf{Backend:} REST APIs, Microservices, Spring Boot, Node.js, JPA/Hibernate, JSON, JUnit, Event-Driven Architecture \\
-\textbf{Systems:} Networking, Concurrency, MQTT/MQTTS, TLS/Certificate Rotation, Rate Limiting, Caching, Retry/Backoff, WAL, Indexing \\
-\textbf{AI/LLM:} LLM Agent Orchestration, Agent Evaluation, MCP \\
-\textbf{Infrastructure:} AWS (EC2, S3, EKS, Lambda, IoT Core), Docker, Kubernetes, Linux, Jenkins CI/CD, Canary/Staged Rollouts, OTA/Delta Updates, RTOS Firmware, Kibana \\
-\textbf{Databases:} MySQL, PostgreSQL, Redis, MongoDB,
+\textbf{Languages:} Java, Python, C, C++, SQL, TypeScript \\
+\textbf{Backend:} Spring Boot, FastAPI, Kafka, Microservices, REST APIs, MQTT/MQTTS, TLS \\
+\textbf{AI/LLM:} vLLM, LLM Serving, Agent Orchestration, Agent Evaluation, Claude Code, MCP \\
+\textbf{Cloud \& DevOps:} AWS (EKS, IoT Core, Lambda, S3), Docker, Kubernetes, Jenkins, Prometheus, Grafana \\
+\textbf{Databases:} MySQL, PostgreSQL, Redis, MongoDB
 
 % ---------- Education ----------
 \section{Education}
@@ -197,8 +188,7 @@ Backend / distributed-systems engineer with production ownership of device-to-cl
 % ---------- Achievements ----------
 \section{Achievements \& Competitive Programming}
 \begin{itemize}[leftmargin=14pt,itemsep=0.5pt,topsep=1pt]
-    \resumeItem{Codeforces Expert, peak rating 1676; ranked 109/40,000+ in Educational Codeforces Round 186 (Div. 2).}
-    \resumeItem{Solved 1200+ algorithmic problems across Codeforces, LeetCode and GeeksforGeeks; LeetCode rating 1669.}
+    \resumeItem{Codeforces Expert (peak 1676; ranked 109/40,000+ in Educational Round 186); 1200+ problems solved; LeetCode rating 1669.}
 \end{itemize}
 
 \end{document}

@@ -31,7 +31,7 @@ export function ScanBar({
     // Below `sm` the secondary buttons keep their icon and drop the label —
     // four labelled buttons do not fit a 390px screen, and an icon with an
     // aria-label reads better than a squashed row.
-    <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
+    <div className="flex w-full min-w-0 max-w-full basis-full flex-wrap items-center justify-end gap-2 sm:w-auto sm:max-w-none sm:basis-auto">
       <Button variant="secondary" size="sm" onClick={onClear} aria-label="Clear discovered jobs">
         <Trash2 className="h-4 w-4" />
         <span className="hidden sm:inline">Clear</span>
@@ -58,9 +58,15 @@ export function ScanBar({
         </Button>
       )}
       {onApplyAll && (
-        <Button variant="secondary" size="sm" onClick={onApplyAll} disabled={scanning || applying}>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={onApplyAll}
+          disabled={scanning || applying}
+          aria-label={applying ? 'Applying' : 'Apply all'}
+        >
           <Send className={clsx('h-4 w-4', applying && 'animate-pulse')} />
-          {applying ? 'Applying' : 'Apply all'}
+          <span className="hidden sm:inline">{applying ? 'Applying' : 'Apply all'}</span>
         </Button>
       )}
       <Button size="sm" onClick={onScan} disabled={scanning || applying}>

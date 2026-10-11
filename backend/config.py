@@ -64,6 +64,10 @@ class Settings(BaseSettings):
     gemini_model: str = "gemini-3.6-flash"
     # Tried when the primary is overloaded or out of quota; blank for none.
     gemini_fallback_model: str = ""
+    # LLM_PROVIDER=openrouter: OpenAI-compatible, one key for many models.
+    open_router_api_key: str = ""
+    openrouter_model: str = "openrouter/free"
+    openrouter_fallback_model: str = ""
     tectonic_path: str = ""                  # blank -> tools/tectonic.exe, then PATH
     master_resume_path: str = "resumes/master_resume.tex"
 

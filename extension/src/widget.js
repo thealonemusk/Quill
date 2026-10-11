@@ -7,59 +7,19 @@
 (function () {
   const TA = (window.__TA = window.__TA || {});
 
-  // Design tokens copied from dashboard/app/globals.css so the panel reads as
-  // part of the same product. The shadow root cannot inherit them — nothing of
-  // the host page's CSS reaches in, which is the point — so they are redeclared
-  // here. Dark mode follows the viewer's OS preference, because an injected
-  // panel has no access to the dashboard's theme toggle.
+  // Colors live in tokens.css, loaded into this shadow root. The root cannot
+  // inherit the page or the dashboard stylesheet.
   const STYLES = `
     :host { all: initial; }
 
     .panel {
-      --surface: #ffffff;
-      --surface-2: #f5f5f7;
-      --surface-3: #ebebed;
-      --border: rgba(0, 0, 0, 0.08);
-      --text-primary: #1d1d1f;
-      --text-secondary: #6e6e73;
-      --text-muted: #86868b;
-      --accent: #0071e3;
-      --accent-ring: rgba(0, 113, 227, 0.2);
-      --success: #34c759;
-      --success-bg: rgba(52, 199, 89, 0.12);
-      --warning: #ff9500;
-      --warning-bg: rgba(255, 149, 0, 0.12);
-      --danger: #ff3b30;
-      --danger-bg: rgba(255, 59, 48, 0.08);
-      --danger-border: rgba(255, 59, 48, 0.2);
-
       position: fixed; right: 20px; bottom: 20px; z-index: 2147483647;
       width: 304px;
-      background: var(--surface); color: var(--text-primary);
-      border: 1px solid var(--border); border-radius: 16px;
-      box-shadow: 0 12px 32px rgba(0, 0, 0, .12), 0 2px 6px rgba(0, 0, 0, .06);
+      border-radius: 22px;
       overflow: hidden;
-      font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       font-size: 13px; line-height: 1.45;
       -webkit-font-smoothing: antialiased;
-    }
-    @media (prefers-color-scheme: dark) {
-      .panel {
-        --surface: #1c1c1e;
-        --surface-2: #2c2c2e;
-        --surface-3: #3a3a3c;
-        --border: rgba(255, 255, 255, 0.1);
-        --text-primary: #f5f5f7;
-        --text-secondary: #a1a1a6;
-        --text-muted: #6e6e73;
-        --accent: #0a84ff;
-        --accent-ring: rgba(10, 132, 255, 0.25);
-        --success-bg: rgba(52, 199, 89, 0.15);
-        --warning-bg: rgba(255, 149, 0, 0.16);
-        --danger-bg: rgba(255, 59, 48, 0.12);
-        --danger-border: rgba(255, 59, 48, 0.25);
-        box-shadow: 0 12px 32px rgba(0, 0, 0, .5);
-      }
     }
     * { box-sizing: border-box; font-family: inherit; }
     .panel.collapsed { width: auto; }
@@ -72,9 +32,8 @@
     .panel.collapsed .head { border-bottom: none; }
     .head:active { cursor: grabbing; }
     .bolt {
-      width: 22px; height: 22px; border-radius: 7px; flex: none;
-      background: var(--accent); display: grid; place-items: center;
-      color: #fff; font-size: 12px;
+      width: 22px; height: 22px; border-radius: 6px; flex: none;
+      display: block; object-fit: cover;
     }
     .name {
       flex: 1; font-weight: 600; font-size: 13px;
@@ -116,7 +75,7 @@
     }
     .btn:active { transform: scale(.985); }
     .btn:disabled { opacity: .5; cursor: not-allowed; }
-    .btn.primary { background: var(--accent); color: #fff; }
+    .btn.primary { background: var(--accent); color: var(--on-signal); }
     .btn.primary:hover:not(:disabled) { filter: brightness(1.08); }
     .btn.ghost {
       background: var(--surface-2); color: var(--text-primary);
@@ -130,6 +89,7 @@
     .stat {
       flex: 1; text-align: center; padding: 8px 4px;
       border-radius: 10px; background: var(--surface-2);
+      border: 1px solid var(--border);
     }
     .stat b { display: block; font-size: 15px; font-weight: 600; letter-spacing: -.02em; }
     .stat span {
@@ -155,7 +115,7 @@
       border: 1px solid var(--danger-border);
     }
     .msg.info { background: var(--surface-2); color: var(--text-secondary); }
-    .msg a { color: var(--accent); }
+    .msg a { color: var(--signal-ink); }
     .msg b { font-weight: 600; }
 
     .foot { font-size: 10.5px; color: var(--text-muted); text-align: center; }
@@ -170,10 +130,10 @@
   `;
 
   const HTML = `
-    <div class="panel" part="panel">
+    <div class="panel liquid-glass" part="panel">
       <div class="head" data-drag>
-        <div class="bolt">⚡</div>
-        <div class="name">TempoApply</div>
+        <img class="bolt" alt="" />
+        <div class="name">Quill</div>
         <div class="dot" data-dot title="backend status"></div>
         <button class="icon-btn" data-toggle title="Collapse">–</button>
         <button class="icon-btn" data-close title="Hide on this page">×</button>
@@ -183,6 +143,7 @@
         <div class="step" data-step hidden></div>
         <button class="btn primary" data-fill>Autofill</button>
         <button class="btn ghost" data-fill-section title="Fill only one part of this form">Fill a section</button>
+        <button class="btn ghost" data-tailor title="Tailor your resume to this job's description. Select the description first if it isn't found.">Tailor resume</button>
         <div class="actions" data-actions-gate hidden></div>
         <div data-results hidden>
           <div class="stats">
@@ -201,6 +162,18 @@
       </div>
     </div>
   `;
+
+  let tokenCss = "";
+  if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.getURL) {
+    fetch(chrome.runtime.getURL("tokens.css"))
+      .then((res) => res.text())
+      .then((css) => {
+        tokenCss = css;
+        const style = root && root.querySelector("style");
+        if (style) style.textContent = tokenCss + STYLES;
+      })
+      .catch(() => {});
+  }
 
   let host = null;
   let root = null;
@@ -227,10 +200,14 @@
     host.style.cssText = "all: initial; position: static;";
     root = host.attachShadow({ mode: "open" });
     const style = document.createElement("style");
-    style.textContent = STYLES;
+    style.textContent = tokenCss + STYLES;
     root.appendChild(style);
     const wrap = document.createElement("div");
     wrap.innerHTML = HTML;
+    const mark = wrap.querySelector(".bolt");
+    if (mark && typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.getURL) {
+      mark.src = chrome.runtime.getURL("icons/icon32.png");
+    }
     root.appendChild(wrap);
     (document.body || document.documentElement).appendChild(host);
 
@@ -242,6 +219,7 @@
       dot: q("[data-dot]"),
       fill: q("[data-fill]"),
       fillSection: q("[data-fill-section]"),
+      tailor: q("[data-tailor]"),
       gate: q("[data-actions-gate]"),
       step: q("[data-step]"),
       results: q("[data-results]"),
@@ -314,6 +292,9 @@
       if (handlers.onFillSection) {
         el.fillSection.addEventListener("click", handlers.onFillSection);
       }
+      if (handlers.onTailor) {
+        el.tailor.addEventListener("click", handlers.onTailor);
+      }
       el.refill.addEventListener("click", handlers.onRefill);
       el.applied.addEventListener("click", handlers.onApplied);
       this.onTodoClick = handlers.onTodoClick;
@@ -325,6 +306,13 @@
     escape: (text) => escapeHtml(text == null ? "" : text),
 
     isMounted: () => !!host && host.isConnected,
+
+    /** Disable Tailor while a run is in flight, and relabel it. */
+    setTailoring(on, label) {
+      if (!host || !el.tailor) return;
+      el.tailor.disabled = !!on;
+      el.tailor.textContent = label || (on ? "Tailoring…" : "Tailor resume");
+    },
 
     setBackend(up, detail) {
       if (!host) return;

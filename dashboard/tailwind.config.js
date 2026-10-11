@@ -9,7 +9,8 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['-apple-system', 'BlinkMacSystemFont', 'Inter', 'Segoe UI', 'sans-serif'],
+        sans: ['Plus Jakarta Sans', 'Segoe UI', 'sans-serif'],
+        display: ['Plus Jakarta Sans', 'Segoe UI', 'sans-serif'],
       },
       animation: {
         'fade-in': 'fadeIn 0.3s ease-out forwards',

@@ -41,6 +41,7 @@ TAILORED_DIR = RESUMES_DIR / "tailored"
 DEFAULT_MASTER = RESUMES_DIR / "master_resume.tex"
 
 MAX_TRIM_ROUNDS = 12
+MAX_REWRITE_GROWTH = 1.15      # the prompt's own "within 15%", enforced
 _JOB_ID_RE = re.compile(r"^[0-9A-Za-z-]{8,64}$")
 
 SYSTEM = (
@@ -74,7 +75,11 @@ HARD RULES — a violation gets the rewrite discarded automatically:
   MQTT; you may describe it as event-driven messaging, but you may not write "Kafka".
 - Never change a number, and never add one. "45 production changes" stays 45.
 - Never claim seniority, team size, or duration that is not stated.
-- Keep each rewrite within roughly 15% of the original length. This resume must stay one page.
+- Keep each rewrite within 15% of the original length — longer rewrites are discarded
+  automatically. This resume must stay one page.
+- Never append a clause that states something the bullet does not ("— ensuring reliability",
+  "collaborating with distributed teams", "establishing testing frameworks"). Reorder and
+  re-word what is there; do not add to it.
 
 WHAT GOOD LOOKS LIKE:
 - Lead with the outcome, then the method.
@@ -476,6 +481,23 @@ def tailor(
         if s.kind == "bullet"
     }
     accepted, rejected = gate.filter(rewrites, scopes)
+
+    # The length rule was only ever in the prompt. Every rewrite from the free
+    # OpenRouter models broke it (122-160% of the original), the extra length
+    # was where unsupported claims went ("collaborating asynchronously in
+    # distributed team environments"), and it pushed the page to two and cost
+    # three bullets. Enforced here, it is a gate like the guard.
+    for slot_id in list(accepted):
+        slot = doc.slot(slot_id)
+        if slot is None:
+            continue
+        limit = max(len(slot.text) * MAX_REWRITE_GROWTH, len(slot.text) + 12)
+        if len(accepted[slot_id]) > limit:
+            rejected.append({
+                "slot": slot_id,
+                "text": accepted.pop(slot_id),
+                "reason": f"longer than allowed ({len(rewrites[slot_id])} chars; limit {int(limit)})",
+            })
     if rejected:
         for item in rejected:
             logger.info(f"Guard rejected {item['slot']}: {item['reason']}")

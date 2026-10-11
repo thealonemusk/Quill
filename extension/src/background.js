@@ -85,6 +85,52 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse(await getResume(message.url, sender.tab && sender.tab.url));
         return;
 
+      // Tailoring: start a run, then poll it — it takes minutes, and a
+      // request here times out in TIMEOUT_MS.
+      case "tailor":
+        sendResponse(
+          await call("/api/autofill/tailor", {
+            method: "POST",
+            body: JSON.stringify({ ...message.payload, tab_url: (sender.tab && sender.tab.url) || "" }),
+          })
+        );
+        return;
+
+      case "tailorStatus": {
+        const result = await call(`/api/autofill/tailor/${encodeURIComponent(message.jobId)}`);
+        // A finished run means this page now has its own PDF; the cached
+        // default must not be attached by the next Autofill.
+        if (result.ok && result.data.state !== "running") resumeCache.clear();
+        if (result.ok && result.data.pdf_url) result.data.pdf_url = `${await apiBase()}${result.data.pdf_url}`;
+        sendResponse(result);
+        return;
+      }
+
+      // Workday's application steps show no description, but its posting page
+      // did, one click earlier in the same tab. Kept per tab for the session.
+      case "rememberJd": {
+        const tabId = sender.tab && sender.tab.id;
+        if (tabId != null && chrome.storage.session) {
+          await chrome.storage.session.set({ [`jd:${tabId}`]: { ...message.jd, url: sender.tab.url, at: Date.now() } });
+        }
+        sendResponse({ ok: true });
+        return;
+      }
+
+      case "recallJd": {
+        const tabId = sender.tab && sender.tab.id;
+        const key = `jd:${tabId}`;
+        const stored = tabId != null && chrome.storage.session ? await chrome.storage.session.get(key) : {};
+        const jd = stored[key];
+        // Same site only: a description remembered from another employer's
+        // posting in this tab must not tailor this one's resume.
+        const sameSite = jd && sender.tab && new URL(jd.url).hostname === new URL(sender.tab.url).hostname;
+        // And recent: an hour-old posting on the same site may be another job.
+        const fresh = jd && Date.now() - (jd.at || 0) < 60 * 60 * 1000;
+        sendResponse({ ok: true, data: sameSite && fresh ? jd : null });
+        return;
+      }
+
       case "track":
         sendResponse(
           await call("/api/autofill/track", {
