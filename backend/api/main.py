@@ -13,7 +13,7 @@ if sys.platform == "win32":
 
 from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks, Query, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, model_validator
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 from loguru import logger
@@ -24,6 +24,7 @@ from backend import seen_ledger
 from backend.config import settings
 from backend.platforms import DEFAULT_SCAN_PLATFORMS, SCAN_PLATFORMS, ALL_PLATFORMS
 from backend.applier.ats import detect_ats
+from backend.autopilot.select import company_tier
 from backend.applier.profile import RESUMES_DIR, load_profile, save_profile
 from backend.api.autofill import router as autofill_router
 from backend.api.autopilot import router as autopilot_router
@@ -132,6 +133,8 @@ class JobOut(BaseModel):
     discovered_at: Optional[datetime]
     visited_at: Optional[datetime]
     applied_at: Optional[datetime]
+    tier: str = "UNKNOWN"
+    tier_value: int = 0
 
     class Config:
         from_attributes = True
@@ -140,6 +143,13 @@ class JobOut(BaseModel):
     @classmethod
     def blank_apply_fields(cls, value):
         return value or ""
+
+    @model_validator(mode="after")
+    def attach_tier(self):
+        tier = company_tier(self.company)
+        self.tier = tier.name
+        self.tier_value = int(tier)
+        return self
 
 
 class ScanRequest(BaseModel):

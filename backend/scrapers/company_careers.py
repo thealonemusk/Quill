@@ -239,6 +239,47 @@ def _scrape_greenhouse(company: dict, roles: List[str]) -> List[dict]:
     return results
 
 
+def _scrape_ashby(company: dict, roles: List[str]) -> List[dict]:
+    """Public Ashby board: https://api.ashbyhq.com/posting-api/job-board/{slug}."""
+    api_id = company["api_id"]
+    name = company["name"]
+    loc_filter = company.get("location_filter", [])
+    results = []
+    url = f"https://api.ashbyhq.com/posting-api/job-board/{api_id}"
+    try:
+        resp = http.get(url, headers=HEADERS, timeout=15)
+        if resp.status_code != 200:
+            logger.warning(f"Ashby {name}: HTTP {resp.status_code} (bad api_id={api_id}?)")
+            return []
+        jobs = resp.json().get("jobs") or []
+        logger.info(f"Ashby {name} ({api_id}): {len(jobs)} total postings")
+        for job in jobs:
+            title = job.get("title", "")
+            if not _role_matches(title, roles):
+                continue
+            location = job.get("location") or ""
+            if not _location_matches(location, loc_filter):
+                continue
+            if not _is_fresh(timestamp_str=job.get("publishedAt") or ""):
+                continue
+            jd_text = job.get("descriptionPlain") or ""
+            if not jd_text and job.get("descriptionHtml"):
+                jd_text = BeautifulSoup(job["descriptionHtml"], "html.parser").get_text(separator="\n").strip()
+            results.append(normalize_job({
+                "title": title,
+                "company": name,
+                "location": location,
+                "url": job.get("jobUrl") or "",
+                "jd_text": jd_text,
+                "easy_apply": True,
+                "ats_type": "ashby",
+            }, "company_careers"))
+        results = [job for job in results if _passes_career_filters(job)]
+    except Exception as e:
+        logger.warning(f"Ashby {name}: {e}")
+    return results
+
+
 # ─── Lever ──────────────────────────────────────────────────────────────────
 
 def _scrape_lever(company: dict, roles: List[str]) -> List[dict]:
@@ -609,7 +650,15 @@ async def scrape_company_career_jobs(
         roles = resolve_discovery_roles(settings.target_roles_list)
 
     search_roles = _expanded_search_roles(roles)
-    company_list = companies or TOP_COMPANIES
+    # Famous boards first. A stopped scan should have spent its time on them,
+    # not on the long tail of boards that never match.
+    from backend.autopilot.select import company_tier
+
+    company_list = sorted(
+        companies or TOP_COMPANIES,
+        key=lambda company: int(company_tier(company.get("name") or "")),
+        reverse=True,
+    )
     all_jobs: List[dict] = []
 
     # Dispatch each company scraper in a thread to avoid blocking the event loop
@@ -623,6 +672,8 @@ async def scrape_company_career_jobs(
                 return await asyncio.to_thread(_scrape_greenhouse, company, search_roles)
             elif ctype == "lever":
                 return await asyncio.to_thread(_scrape_lever, company, search_roles)
+            elif ctype == "ashby":
+                return await asyncio.to_thread(_scrape_ashby, company, search_roles)
             elif ctype == "workday":
                 return await asyncio.to_thread(_scrape_workday, company, search_roles)
             elif ctype == "custom":

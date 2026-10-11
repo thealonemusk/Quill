@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import clsx from 'clsx';
 import { api } from '@/lib/api';
-import { DEFAULT_SCAN_PLATFORMS, PLATFORM_LABELS, platformLabel } from '@/lib/platforms';
 import type { Job } from '@/lib/types';
 import { ScanBar } from '@/components/ScanBar';
 import { JobCard, JobRow } from '@/components/JobRow';
@@ -23,9 +22,8 @@ export default function JobsPage() {
   const [scanStalled, setScanStalled] = useState(false);
   const [applying, setApplying] = useState(false);
   const [search, setSearch] = useState('');
-  const [filterPlatform, setFilterPlatform] = useState('');
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
-  const [sortBy, setSortBy] = useState<'score' | 'date'>('score');
+  const [sortBy, setSortBy] = useState<'popularity' | 'score' | 'date'>('popularity');
   const [currentPage, setCurrentPage] = useState(1);
 
   const loadJobs = useCallback(async (quiet = false) => {
@@ -222,7 +220,6 @@ export default function JobsPage() {
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return jobs.filter((j) => {
-      if (filterPlatform && j.platform !== filterPlatform) return false;
       if (!q) return true;
       return (
         j.title.toLowerCase().includes(q) ||
@@ -230,7 +227,7 @@ export default function JobsPage() {
         j.location.toLowerCase().includes(q)
       );
     });
-  }, [jobs, search, filterPlatform]);
+  }, [jobs, search]);
 
   const sorted = useMemo(() => {
     return [...filtered].sort((a, b) => {
@@ -238,6 +235,12 @@ export default function JobsPage() {
       const bVisited = b.visited_at ? 1 : 0;
       if (aVisited !== bVisited) return aVisited - bVisited;
 
+      if (sortBy === 'popularity') {
+        const diff = (b.tier_value ?? 0) - (a.tier_value ?? 0);
+        if (diff !== 0) return sortOrder === 'desc' ? diff : -diff;
+        const score = (b.relevance_score || 0) - (a.relevance_score || 0);
+        if (score !== 0) return score;
+      }
       if (sortBy === 'score') {
         const diff = (b.relevance_score || 0) - (a.relevance_score || 0);
         if (diff !== 0) return sortOrder === 'desc' ? diff : -diff;
@@ -260,13 +263,7 @@ export default function JobsPage() {
   const totalPages = Math.max(1, Math.ceil(queueJobs.length / JOBS_PER_PAGE));
   const pageJobs = queueJobs.slice((currentPage - 1) * JOBS_PER_PAGE, currentPage * JOBS_PER_PAGE);
 
-  useEffect(() => setCurrentPage(1), [search, filterPlatform, sortOrder, sortBy]);
-
-  const platformChips = useMemo(() => {
-    const fromJobs = jobs.map((j) => j.platform);
-    const keys = Array.from(new Set([...DEFAULT_SCAN_PLATFORMS, ...fromJobs]));
-    return keys.filter((k) => PLATFORM_LABELS[k] || k);
-  }, [jobs]);
+  useEffect(() => setCurrentPage(1), [search, sortOrder, sortBy]);
 
   const pendingStatuses: Job['status'][] = ['discovered', 'scored'];
   const pendingCount = jobs.filter((j) => pendingStatuses.includes(j.status)).length;
@@ -372,9 +369,10 @@ export default function JobsPage() {
             </div>
             <select
               value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as 'score' | 'date')}
+              onChange={(e) => setSortBy(e.target.value as 'popularity' | 'score' | 'date')}
               className="min-w-0 flex-1 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-sm text-[var(--text-secondary)] shadow-[var(--shadow-rest)] outline-none focus:border-[var(--accent)] sm:flex-none"
             >
+              <option value="popularity">Popularity</option>
               <option value="score">Best match</option>
               <option value="date">Date</option>
             </select>
@@ -383,39 +381,13 @@ export default function JobsPage() {
               onChange={(e) => setSortOrder(e.target.value as 'desc' | 'asc')}
               className="min-w-0 flex-1 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-sm text-[var(--text-secondary)] shadow-[var(--shadow-rest)] outline-none focus:border-[var(--accent)] sm:flex-none"
             >
-              <option value="desc">{sortBy === 'score' ? 'Highest score' : 'Newest'}</option>
-              <option value="asc">{sortBy === 'score' ? 'Lowest score' : 'Oldest'}</option>
+              <option value="desc">
+                {sortBy === 'popularity' ? 'Famous first' : sortBy === 'score' ? 'Highest score' : 'Newest'}
+              </option>
+              <option value="asc">
+                {sortBy === 'popularity' ? 'Least known' : sortBy === 'score' ? 'Lowest score' : 'Oldest'}
+              </option>
             </select>
-          </div>
-
-          <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 pb-0.5 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0">
-            <button
-              type="button"
-              onClick={() => setFilterPlatform('')}
-              className={clsx(
-                'shrink-0 whitespace-nowrap rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors',
-                !filterPlatform
-                  ? 'bg-[var(--ink)] text-[var(--on-ink)]'
-                  : 'bg-[var(--surface)] text-[var(--text-secondary)] shadow-[var(--shadow-rest)] ring-1 ring-[var(--border)] hover:ring-[var(--text-primary)]',
-              )}
-            >
-              All
-            </button>
-            {platformChips.map((p) => (
-              <button
-                key={p}
-                type="button"
-                onClick={() => setFilterPlatform(p)}
-                className={clsx(
-                  'shrink-0 whitespace-nowrap rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors',
-                  filterPlatform === p
-                    ? 'bg-[var(--ink)] text-[var(--on-ink)]'
-                    : 'bg-[var(--surface)] text-[var(--text-secondary)] shadow-[var(--shadow-rest)] ring-1 ring-[var(--border)] hover:ring-[var(--text-primary)]',
-                )}
-              >
-                {platformLabel(p)}
-              </button>
-            ))}
           </div>
 
           <div className="md:overflow-hidden md:rounded-2xl md:border md:border-[var(--border)] md:bg-[var(--surface)] md:shadow-[var(--shadow-card)]">

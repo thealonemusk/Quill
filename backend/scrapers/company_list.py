@@ -498,6 +498,20 @@ TOP_COMPANIES = [
         "location_filter": INDIA_LOCS,
     },
 
+    # ──────────────────── Ashby (verified 2026-10-11) ─────────────────────
+    {
+        "name": "Notion",
+        "type": "ashby",
+        "api_id": "notion",
+        "location_filter": INDIA_LOCS,
+    },
+    {
+        "name": "OpenAI",
+        "type": "ashby",
+        "api_id": "openai",
+        "location_filter": INDIA_LOCS,
+    },
+
     # ──────────────────── Lever ATS (verified) ─────────────────────
     {
         "name": "Spotify",

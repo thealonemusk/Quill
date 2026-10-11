@@ -32,6 +32,8 @@ export interface Job {
   ats_type?: string;
   apply_status?: string;
   apply_error?: string;
+  tier?: string;
+  tier_value?: number;
 }
 
 export interface Analytics {

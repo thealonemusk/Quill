@@ -61,7 +61,7 @@ STRONG = {
     "goldman sachs", "morgan stanley", "jpmorgan", "j.p. morgan", "visa",
     "mastercard", "paypal", "walmart", "target", "expedia", "booking",
     "thoughtworks", "tower research", "d. e. shaw", "de shaw", "optiver",
-    "jane street", "millennium", "graviton", "quadeye",
+    "jane street", "millennium", "graviton", "quadeye", "rubrik", "pure storage",
 }
 
 KNOWN = {
