@@ -302,6 +302,28 @@ def test_job_location(profile: ApplicantProfile) -> None:
     check("unknown page: sponsorship left blank", under("", no_country), "")
     check("a named country still wins over the job's", under("Bengaluru", "Are you authorized to work in the US?"), "No")
 
+    from backend.applier.fields import APPLY_REGION
+
+    def under_region(location: str, label: str, region: str) -> str:
+        loc = JOB_LOCATION.set(location)
+        reg = APPLY_REGION.set(region)
+        try:
+            return resolve_value(profile, label)
+        finally:
+            JOB_LOCATION.reset(loc)
+            APPLY_REGION.reset(reg)
+
+    uk_sponsor = "Will you require visa sponsorship to work in the United Kingdom?"
+    check("Europe + London: sponsorship Yes", under_region("London", no_country, "europe"), "Yes")
+    check("Europe + London: not authorised", under_region("London", in_country, "europe"), "No")
+    check("Europe + Berlin: sponsorship Yes", under_region("Berlin, Germany", no_country, "europe"), "Yes")
+    check("Europe + named UK sponsorship Yes", under_region("", uk_sponsor, "europe"), "Yes")
+    check("Europe + UK authorisation No",
+          under_region("London", "Do you have the right to work in the United Kingdom?", "europe"), "No")
+    check("Europe + US sponsorship still blank",
+          under_region("Seattle, WA, United States", no_country, "europe"), "")
+    check("India mode + London sponsorship stays blank", under_region("London", no_country, "india"), "")
+
 
 def test_consent() -> None:
     section("Consent boxes — ticked unasked, so marketing opt-ins must never qualify")

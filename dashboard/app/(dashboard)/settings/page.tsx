@@ -128,12 +128,14 @@ export default function SettingsPage() {
   };
 
   const handleClearJobs = async () => {
-    if (!confirm('Clear all discovered jobs that are not applied?')) return;
+    const place = cfg?.target_region === 'europe' ? 'Europe' : 'India';
+    if (!confirm(`Clear discovered ${place} jobs that are not applied? The other region is left as it is.`)) return;
     await api.clearDiscoveredJobs();
   };
 
   const handlePurgeExperienced = async () => {
-    if (!confirm('Remove jobs that fail the 0-2 year, India-only, or no-frontend filters?')) return;
+    const place = cfg?.target_region === 'europe' ? 'Europe' : 'India';
+    if (!confirm(`Remove ${place} jobs that fail the 0-2 year or role filters? The other region is left as it is.`)) return;
     await api.purgeExperiencedJobs();
   };
 

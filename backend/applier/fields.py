@@ -341,6 +341,9 @@ def _home_country(profile: ApplicantProfile) -> str:
 # apply engine and once per request by the autofill API, so every resolver on
 # the path sees it without threading a parameter through a dozen signatures.
 JOB_LOCATION: ContextVar[str] = ContextVar("job_location", default="")
+# india | europe. Set with JOB_LOCATION. Default india, so a question about
+# the UK stays blank on sponsorship until Europe mode is actually on.
+APPLY_REGION: ContextVar[str] = ContextVar("apply_region", default="india")
 
 
 def _job_countries(location: str) -> set:
@@ -395,6 +398,11 @@ def work_auth_answer(profile: ApplicantProfile, label: str) -> Optional[str]:
     # its location answers that; when it is not, the question stays blank.
     if not named:
         named = _job_countries(JOB_LOCATION.get())
+    # "London" names no country in COUNTRY_NAMES. Europe mode maps the city.
+    if APPLY_REGION.get() == "europe" and not named:
+        from backend.scrapers.filter_utils import europe_countries_in
+
+        named = europe_countries_in(JOB_LOCATION.get())
     if not named or not home:
         return ""
 
@@ -406,6 +414,20 @@ def work_auth_answer(profile: ApplicantProfile, label: str) -> Optional[str]:
             best, best_len = str(answer), len(needle_n)
     if best is not None:
         return best
+
+    # Europe mode is his instruction that he needs a visa in these four
+    # countries. A US question is not one of them, and stays blank.
+    if APPLY_REGION.get() == "europe":
+        from backend.scrapers.filter_utils import EUROPE_COUNTRIES
+
+        if named <= set(EUROPE_COUNTRIES):
+            if auth and sponsor:
+                if _has_phrase(n, "without"):
+                    return "No"
+                return ""
+            if sponsor:
+                return "Yes"
+            return "No"
 
     if named == {home}:
         if auth and sponsor:

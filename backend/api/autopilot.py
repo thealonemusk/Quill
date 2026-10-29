@@ -87,10 +87,28 @@ def candidates(
     """
     # Rejected and ignored are decisions, not a queue: re-selecting them
     # re-filled jobs the user had closed, and "tailored" overwrote the status.
-    jobs = db.query(Job).filter(~Job.status.in_(CLOSED_STATUSES)).all()
+    from backend.scrapers.filter_utils import EUROPE_PREFERRED_LOCATIONS, matches_region
+
+    region = settings.active_region
+    jobs = [
+        job for job in db.query(Job).filter(~Job.status.in_(CLOSED_STATUSES)).all()
+        if matches_region(
+            {
+                "location": job.location or "",
+                "title": job.title or "",
+                "jd_text": job.jd_text or "",
+                "platform": job.platform or "",
+            },
+            region,
+        )
+    ]
+    preferred = (
+        EUROPE_PREFERRED_LOCATIONS if region == "europe"
+        else settings.preferred_locations_list
+    )
     chosen, passed = select(
         jobs,
-        preferred_locations=settings.preferred_locations_list,
+        preferred_locations=preferred,
         limit=limit,
         min_tier=_tier_from_name(min_tier),
         auto_only=auto_only,

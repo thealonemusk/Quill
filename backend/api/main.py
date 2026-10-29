@@ -189,6 +189,21 @@ class ManualJobRequest(BaseModel):
 
 # ─── Jobs Endpoints ──────────────────────────────────────────────────────────
 
+def _job_in_region(job) -> bool:
+    """Hide the other region's rows. They stay in the database."""
+    from backend.scrapers.filter_utils import matches_region
+
+    return matches_region(
+        {
+            "location": job.location or "",
+            "title": job.title or "",
+            "jd_text": job.jd_text or "",
+            "platform": job.platform or "",
+        },
+        settings.active_region,
+    )
+
+
 @app.get("/api/jobs", response_model=List[JobOut])
 def get_jobs(
     status: Optional[str] = Query(None),
@@ -224,7 +239,7 @@ def get_jobs(
             dirty = True
     if dirty:
         db.commit()
-    return jobs
+    return [job for job in jobs if _job_in_region(job)]
 
 
 @app.get("/api/jobs/{job_id}", response_model=JobOut)
@@ -338,12 +353,18 @@ def clear_discovered_jobs(
     `include_applied` also removes rows already applied to. The application
     itself stays recorded in the seen ledger, which is what stops the job
     being offered again, but the `jobs` row and its Application detail go.
+
+    Only the region selected on the dashboard. Clearing India leaves the
+    UK / Ireland / Germany / Netherlands rows, and the reverse.
     """
     statuses = list(CLEARABLE_STATUSES)
     if include_applied:
         statuses.append("applied")
 
-    jobs_to_delete = db.query(Job).filter(Job.status.in_(statuses)).all()
+    jobs_to_delete = [
+        job for job in db.query(Job).filter(Job.status.in_(statuses)).all()
+        if _job_in_region(job)
+    ]
 
     # Only a row carrying no decision becomes "cleared". Applied, rejected,
     # ignored (dismissed) and opened (visited) rows keep that decision in the
@@ -399,13 +420,15 @@ def purge_stale_jobs(
 
 @app.post("/api/jobs/purge-experienced")
 def purge_experienced_jobs(db: Session = Depends(get_db)):
-    """Purge jobs that fail experience, frontend, or India-location filters."""
+    """Purge this region's jobs that fail experience, frontend, or location filters."""
     from backend.scrapers.filter_utils import is_career_listing_eligible, passes_hard_filters
 
     all_jobs = db.query(Job).all()
     purged_count = 0
     for job in all_jobs:
         if job.status in {"applied", "interviewing", "offer"}:
+            continue
+        if not _job_in_region(job):
             continue
         job_dict = {
             "title": job.title,
@@ -415,7 +438,9 @@ def purge_experienced_jobs(db: Session = Depends(get_db)):
             "jd_text": job.jd_text,
             "platform": job.platform,
         }
-        is_valid, _ = passes_hard_filters(job_dict, max_years=settings.experience_years)
+        is_valid, _ = passes_hard_filters(
+            job_dict, max_years=settings.experience_years, region=settings.active_region,
+        )
         if is_valid and job.platform == "company_careers":
             is_valid, _ = is_career_listing_eligible(job_dict)
         if not is_valid:
@@ -674,8 +699,11 @@ async def start_apply(
         cutoff = datetime.utcnow() - timedelta(hours=JOB_FRESHNESS_HOURS)
         job_ids = [
             j.id for j in eligible_jobs(db)
-            if j.status not in ("discovered", "scored")
-            or (j.discovered_at is not None and j.discovered_at >= cutoff)
+            if _job_in_region(j)
+            and (
+                j.status not in ("discovered", "scored")
+                or (j.discovered_at is not None and j.discovered_at >= cutoff)
+            )
         ]
         if not job_ids:
             raise HTTPException(status_code=400, detail="No eligible jobs to apply to")
@@ -754,12 +782,23 @@ def get_analytics(db: Session = Depends(get_db)):
 
 # ─── Settings ────────────────────────────────────────────────────────────────
 
+def _target_region(new_settings: dict) -> str:
+    """india or europe. A save that omits the field keeps the current one."""
+    if "target_region" not in new_settings or new_settings.get("target_region") in (None, ""):
+        return settings.active_region
+    region = str(new_settings.get("target_region") or "").strip().lower()
+    if region not in {"india", "europe"}:
+        raise HTTPException(status_code=400, detail="target_region must be india or europe")
+    return region
+
+
 @app.get("/api/settings")
 def get_settings():
     return {
         "target_roles": settings.target_roles_list,
         "experience_years": settings.experience_years,
         "preferred_locations": settings.preferred_locations_list,
+        "target_region": settings.active_region,
         "min_relevance_score": settings.min_relevance_score,
         "user_full_name": settings.user_full_name,
         "excluded_companies": settings.excluded_companies_list,
@@ -786,6 +825,7 @@ def update_settings(new_settings: dict):
         "TARGET_ROLES": ",".join(new_settings.get("target_roles", settings.target_roles_list)),
         "EXPERIENCE_YEARS": str(new_settings.get("experience_years", settings.experience_years)),
         "PREFERRED_LOCATIONS": ",".join(new_settings.get("preferred_locations", settings.preferred_locations_list)),
+        "TARGET_REGION": _target_region(new_settings),
         "MIN_RELEVANCE_SCORE": str(new_settings.get("min_relevance_score", settings.min_relevance_score)),
         "USER_FULL_NAME": new_settings.get("user_full_name", settings.user_full_name),
         "EXCLUDED_COMPANIES": ",".join(

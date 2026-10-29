@@ -67,6 +67,56 @@ def _exp_ok(jd: str, max_years=2) -> bool:
 # ── 1. Location ──────────────────────────────────────────────────────────────
 
 
+def test_europe() -> None:
+    section("1b. Europe: UK, Ireland, Germany, Netherlands; a visa refusal drops the post")
+    from backend.scrapers.filter_utils import europe_countries_in, passes_hard_filters, visa_refused
+
+    def eu(location: str, jd: str = "", title: str = "Software Engineer") -> bool:
+        return is_location_allowed(
+            {"location": location, "title": title, "jd_text": jd, "platform": "linkedin"},
+            region="europe",
+        )[0]
+
+    def kept(location: str, jd: str) -> bool:
+        return passes_hard_filters(
+            {
+                "location": location,
+                "title": "Software Engineer",
+                "jd_text": jd,
+                "platform": "linkedin",
+            },
+            region="europe",
+            require_jd=False,
+        )[0]
+
+    for city in (
+        "London, United Kingdom", "Manchester", "Remote, UK",
+        "Dublin, Ireland", "Berlin, Germany", "Amsterdam, Netherlands",
+        "Edinburgh, Scotland", "Belfast, Northern Ireland",
+    ):
+        check(f"Europe keeps {city!r}", eu(city), True)
+    check("Europe rejects Bengaluru", eu("Bengaluru, Karnataka"), False)
+    check("Europe rejects Paris", eu("Paris, France"), False)
+    check("Europe rejects Seattle", eu("Seattle, WA"), False)
+    check("Europe rejects bare Remote", eu("Remote"), False)
+    check("Europe rejects London; Seattle", eu("London; Seattle, WA"), False)
+    check("Europe rejects Indianapolis", eu("Indianapolis, IN"), False)
+    check("Northern Ireland is the UK only",
+          europe_countries_in("Northern Ireland"), {"united kingdom"})
+
+    silent = "We are hiring a software engineer to build APIs."
+    check("silent description kept", kept("London", silent), True)
+    check("visa refusal dropped",
+          kept("London", "Candidates must already have the right to work in the UK."), False)
+    check("same sentence offering sponsorship kept",
+          kept("London", "You must be authorized to work in the UK, or we will sponsor a visa."), True)
+    check("will not sponsor dropped",
+          kept("Berlin", "We will not sponsor work visas."), False)
+    check("cannot provide sponsorship dropped",
+          kept("Amsterdam", "We cannot provide sponsorship for this role."), False)
+    check("refusal detector ignores a silent JD", visa_refused(silent)[0], False)
+
+
 def test_location() -> None:
     section("1. Location: the location field decides; JD boilerplate does not override it")
     check("Seattle + JD 'teams span US, Europe and India' rejected",
@@ -276,18 +326,28 @@ def test_ledger() -> None:
     db.close()
 
     section("4. Ledger: Clear / PATCH / purge-stale / purge-experienced keep decisions")
+    from backend.config import settings
+
     Session = _memory_db()
     client = _client(Session)
     db = Session()
     now = datetime.utcnow()
     old = now - timedelta(days=30)
+    saved_region = settings.target_region
+    settings.target_region = "india"
+    # Clear and the purges only touch the active region, so these rows have
+    # to be India jobs or the endpoint leaves them alone.
     rows = [
-        Job(id="ign", title="SE", company="A", platform="p", url="https://a.example/ign", status="ignored"),
-        Job(id="rej", title="SE", company="A", platform="p", url="https://a.example/rej", status="rejected"),
+        Job(id="ign", title="SE", company="A", platform="p", url="https://a.example/ign",
+            location="Bengaluru", status="ignored"),
+        Job(id="rej", title="SE", company="A", platform="p", url="https://a.example/rej",
+            location="Bengaluru", status="rejected"),
         Job(id="vis", title="SE", company="A", platform="p", url="https://a.example/vis",
-            status="discovered", visited_at=now),
-        Job(id="new", title="SE", company="A", platform="p", url="https://a.example/new", status="discovered"),
-        Job(id="app", title="SE", company="A", platform="p", url="https://a.example/app", status="applied"),
+            location="Bengaluru", status="discovered", visited_at=now),
+        Job(id="new", title="SE", company="A", platform="p", url="https://a.example/new",
+            location="Bengaluru", status="discovered"),
+        Job(id="app", title="SE", company="A", platform="p", url="https://a.example/app",
+            location="Bengaluru", status="applied"),
     ]
     db.add_all(rows)
     db.commit()
@@ -316,9 +376,9 @@ def test_ledger() -> None:
     check("PATCH ignored is recorded as dismissed", _ledger_status(db, "https://b.example/p2"), "dismissed")
 
     db.add(Job(id="st", title="SE", company="C", platform="p", url="https://c.example/st",
-               status="discovered", discovered_at=old, visited_at=old))
+               location="Bengaluru", status="discovered", discovered_at=old, visited_at=old))
     db.add(Job(id="st2", title="SE", company="C", platform="p", url="https://c.example/st2",
-               status="discovered", discovered_at=old))
+               location="Bengaluru", status="discovered", discovered_at=old))
     db.commit()
     check("purge-stale answers", client.post("/api/jobs/purge-stale").status_code, 200)
     db.expire_all()
@@ -336,6 +396,7 @@ def test_ledger() -> None:
     check("purge-experienced: rejected kept", _ledger_status(db, "https://d.example/ex1"), "rejected")
     check("purge-experienced: ignored kept as dismissed", _ledger_status(db, "https://d.example/ex2"), "dismissed")
     check("purge-experienced: undecided is filtered", _ledger_status(db, "https://d.example/ex3"), "filtered")
+    settings.target_region = saved_region
     db.close()
 
 
@@ -348,7 +409,7 @@ def test_dedup() -> None:
 
     section("5. Dedup: same title, different requisitions survive")
     saved = pipeline.passes_hard_filters, pipeline.score_job
-    pipeline.passes_hard_filters = lambda job, max_years=2: (True, "")
+    pipeline.passes_hard_filters = lambda job, max_years=2, region="india": (True, "")
     pipeline.score_job = lambda job, **kw: (90.0, "stub")
     try:
         Session = _memory_db()
@@ -409,11 +470,13 @@ def test_apply_all() -> None:
     db = Session()
     now = datetime.utcnow()
     db.add(Job(id="fresh", title="SE", company="A", platform="p", url="https://a.example/f",
-               status="discovered", discovered_at=now))
+               location="Bengaluru", status="discovered", discovered_at=now))
     db.add(Job(id="stale", title="SE", company="A", platform="p", url="https://a.example/s",
-               status="discovered", discovered_at=now - timedelta(days=30)))
+               location="Bengaluru", status="discovered", discovered_at=now - timedelta(days=30)))
     db.commit()
 
+    saved_region = main.settings.target_region
+    main.settings.target_region = "india"
     shown = {j["id"] for j in client.get("/api/jobs").json()}
     captured: dict = {}
 
@@ -443,6 +506,7 @@ def test_apply_all() -> None:
     finally:
         engine.run_apply_pipeline = saved_run
         main.load_profile = saved_profile
+        main.settings.target_region = saved_region
         main._apply_status["running"] = False
         db.close()
 
@@ -451,12 +515,58 @@ def test_apply_all() -> None:
     check("handleApplyAll passes eligible ids", "api.startApply(eligible.map((j) => j.id))" in page, True)
 
 
+def test_clear_region() -> None:
+    from backend.config import settings
+    from backend.db.models import Job
+
+    section("4b. Clear only removes the active region")
+    Session = _memory_db()
+    client = _client(Session)
+    db = Session()
+    db.add(Job(id="in", title="SE", company="A", platform="linkedin",
+               url="https://in.example/1", location="Bengaluru", status="discovered"))
+    db.add(Job(id="eu", title="SE", company="B", platform="linkedin",
+               url="https://eu.example/1", location="London, United Kingdom", status="discovered"))
+    db.add(Job(id="eu-vis", title="SE", company="B", platform="linkedin",
+               url="https://eu.example/2", location="Berlin, Germany",
+               status="discovered", visited_at=datetime.utcnow()))
+    db.commit()
+    saved = settings.target_region
+    try:
+        settings.target_region = "india"
+        check("india clear answers",
+              client.delete("/api/jobs/clear?include_applied=true").status_code, 200)
+        db.expire_all()
+        left = {j.id for j in db.query(Job).all()}
+        check("india clear removes Bengaluru", "in" in left, False)
+        check("india clear keeps London", "eu" in left, True)
+        check("india clear keeps Berlin", "eu-vis" in left, True)
+        check("remove-visited in India leaves Berlin",
+              client.post("/api/jobs/purge-visited").status_code, 200)
+        db.expire_all()
+        left = {j.id for j in db.query(Job).all()}
+        check("Berlin still there after India remove-visited", "eu-vis" in left, True)
+
+        settings.target_region = "europe"
+        check("europe clear answers",
+              client.delete("/api/jobs/clear?include_applied=true").status_code, 200)
+        db.expire_all()
+        left = {j.id for j in db.query(Job).all()}
+        check("europe clear removes London", "eu" in left, False)
+        check("europe clear removes Berlin", "eu-vis" in left, False)
+    finally:
+        settings.target_region = saved
+        db.close()
+
+
 def main() -> None:
+    test_europe()
     test_location()
     test_titles()
     test_experience()
     test_tiers()
     test_ledger()
+    test_clear_region()
     test_dedup()
     test_apply_all()
     print()

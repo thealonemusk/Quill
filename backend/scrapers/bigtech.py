@@ -40,6 +40,29 @@ INDIA_TOKENS = ("india", "bengaluru", "bangalore", "hyderabad", "pune", "mumbai"
                 "delhi", "noida", "gurgaon", "gurugram", "chennai", "kolkata")
 
 
+def _search_places() -> List[tuple]:
+    """(location query, Amazon country code) for the active region."""
+    from backend.config import settings
+
+    if settings.active_region == "europe":
+        return [
+            ("United Kingdom", "GBR"),
+            ("Ireland", "IRL"),
+            ("Germany", "DEU"),
+            ("Netherlands", "NLD"),
+        ]
+    return [("India", "IND")]
+
+
+def _location_in_region(location: str) -> bool:
+    from backend.config import settings
+    from backend.scrapers.filter_utils import europe_location_ok
+
+    if settings.active_region == "europe":
+        return europe_location_ok(location)
+    return _is_india(location)
+
+
 def _is_india(location: str) -> bool:
     """
     Location match on word boundaries.
@@ -76,62 +99,63 @@ def scrape_amazon(
     found: List[Dict] = []
     seen: set[str] = set()
 
-    for role in roles:
-        offset = 0
-        while len(found) < max_jobs:
-            params = {
-                "base_query": role,
-                "loc_query": "India",
-                "country": "IND",
-                "result_limit": page_size,
-                "offset": offset,
-                "sort": "recent",
-            }
-            try:
-                resp = requests.get(AMAZON_SEARCH, params=params, headers=HEADERS, timeout=TIMEOUT)
-                if resp.status_code != 200:
-                    logger.warning(f"Amazon search HTTP {resp.status_code} for {role!r}")
-                    break
-                payload = resp.json()
-            except Exception as exc:  # noqa: BLE001 - one bad role must not kill the scan
-                logger.warning(f"Amazon search failed for {role!r}: {exc}")
-                break
-
-            jobs = payload.get("jobs") or []
-            if not jobs:
-                break
-
-            for job in jobs:
-                path = job.get("job_path") or ""
-                url = f"{AMAZON_JOB}{path}" if path.startswith("/") else path
-                if not url or url in seen:
-                    continue
-                location = job.get("location") or job.get("normalized_location") or ""
-                if not _is_india(location):
-                    continue
-                seen.add(url)
-                found.append(normalize_job({
-                    "title": job.get("title") or "",
-                    "company": "Amazon",
-                    "url": url,
-                    "location": location,
-                    "jd_text": " ".join(filter(None, [
-                        job.get("description") or "",
-                        job.get("basic_qualifications") or "",
-                        job.get("preferred_qualifications") or "",
-                    ]))[:20000],
-                    "experience_required": job.get("job_schedule_type") or "",
-                    "easy_apply": False,
-                }, "bigtech"))
-                if len(found) >= max_jobs:
+    for place, country in _search_places():
+        for role in roles:
+            offset = 0
+            while len(found) < max_jobs:
+                params = {
+                    "base_query": role,
+                    "loc_query": place,
+                    "country": country,
+                    "result_limit": page_size,
+                    "offset": offset,
+                    "sort": "recent",
+                }
+                try:
+                    resp = requests.get(AMAZON_SEARCH, params=params, headers=HEADERS, timeout=TIMEOUT)
+                    if resp.status_code != 200:
+                        logger.warning(f"Amazon search HTTP {resp.status_code} for {role!r} in {place}")
+                        break
+                    payload = resp.json()
+                except Exception as exc:  # noqa: BLE001 - one bad role must not kill the scan
+                    logger.warning(f"Amazon search failed for {role!r} in {place}: {exc}")
                     break
 
-            offset += page_size
-            if offset >= int(payload.get("hits") or 0):
-                break
-            time.sleep(0.4)          # be a polite client
+                jobs = payload.get("jobs") or []
+                if not jobs:
+                    break
 
-    logger.info(f"Amazon: {len(found)} India roles")
+                for job in jobs:
+                    path = job.get("job_path") or ""
+                    url = f"{AMAZON_JOB}{path}" if path.startswith("/") else path
+                    if not url or url in seen:
+                        continue
+                    location = job.get("location") or job.get("normalized_location") or ""
+                    if not _location_in_region(location):
+                        continue
+                    seen.add(url)
+                    found.append(normalize_job({
+                        "title": job.get("title") or "",
+                        "company": "Amazon",
+                        "url": url,
+                        "location": location,
+                        "jd_text": " ".join(filter(None, [
+                            job.get("description") or "",
+                            job.get("basic_qualifications") or "",
+                            job.get("preferred_qualifications") or "",
+                        ]))[:20000],
+                        "experience_required": job.get("job_schedule_type") or "",
+                        "easy_apply": False,
+                    }, "bigtech"))
+                    if len(found) >= max_jobs:
+                        break
+
+                offset += page_size
+                if offset >= int(payload.get("hits") or 0):
+                    break
+                time.sleep(0.4)          # be a polite client
+
+    logger.info(f"Amazon: {len(found)} roles")
     return found
 
 
@@ -154,36 +178,39 @@ async def scrape_microsoft(
         async with async_playwright() as pw:
             browser, ctx = await create_browser_context(pw, headless=headless)
             page = await ctx.new_page()
-            for role in roles:
-                url = (
-                    "https://jobs.careers.microsoft.com/global/en/search"
-                    f"?q={requests.utils.quote(role)}&lc=India"
-                )
-                await page.goto(url, wait_until="networkidle", timeout=70000)
-                await page.wait_for_timeout(9000)          # heavy SPA
-                await _scroll(page)
-                # Result cards are anchors to apply.careers.microsoft.com; the
-                # title and location are the first two lines of the card text.
-                cards = await page.evaluate(
-                    """() => Array.from(document.querySelectorAll('a[href*="/careers/job/"]'))
-                        .map(a => {
-                          const lines = a.innerText.split('\\n').map(s => s.trim()).filter(Boolean);
-                          return {title: lines[0] || '', location: lines[1] || '', href: a.href};
-                        }).filter(x => x.title && x.href)"""
-                )
-                for card in cards:
-                    # The lc= parameter does not reliably filter, so the location
-                    # is checked here rather than trusted from the query.
-                    if not _is_india(card.get("location", "")):
-                        continue
-                    found.append(normalize_job({
-                        "title": card["title"],
-                        "company": "Microsoft",
-                        "url": card["href"],
-                        "location": card.get("location") or "India",
-                        "jd_text": "",
-                        "easy_apply": False,
-                    }, "bigtech"))
+            for place, _country in _search_places():
+                for role in roles:
+                    url = (
+                        "https://jobs.careers.microsoft.com/global/en/search"
+                        f"?q={requests.utils.quote(role)}&lc={requests.utils.quote(place)}"
+                    )
+                    await page.goto(url, wait_until="networkidle", timeout=70000)
+                    await page.wait_for_timeout(9000)          # heavy SPA
+                    await _scroll(page)
+                    # Result cards are anchors to apply.careers.microsoft.com; the
+                    # title and location are the first two lines of the card text.
+                    cards = await page.evaluate(
+                        """() => Array.from(document.querySelectorAll('a[href*="/careers/job/"]'))
+                            .map(a => {
+                              const lines = a.innerText.split('\\n').map(s => s.trim()).filter(Boolean);
+                              return {title: lines[0] || '', location: lines[1] || '', href: a.href};
+                            }).filter(x => x.title && x.href)"""
+                    )
+                    for card in cards:
+                        # The lc= parameter does not reliably filter, so the location
+                        # is checked here rather than trusted from the query.
+                        if not _location_in_region(card.get("location", "")):
+                            continue
+                        found.append(normalize_job({
+                            "title": card["title"],
+                            "company": "Microsoft",
+                            "url": card["href"],
+                            "location": card.get("location") or place,
+                            "jd_text": "",
+                            "easy_apply": False,
+                        }, "bigtech"))
+                        if len(found) >= max_jobs:
+                            break
                     if len(found) >= max_jobs:
                         break
                 if len(found) >= max_jobs:
@@ -191,7 +218,7 @@ async def scrape_microsoft(
     except Exception as exc:  # noqa: BLE001
         logger.warning(f"Microsoft scrape failed: {exc}")
 
-    logger.info(f"Microsoft: {len(found)} India roles")
+    logger.info(f"Microsoft: {len(found)} roles")
     return found
 
 
@@ -203,48 +230,65 @@ async def scrape_google(
 
     from backend.scrapers.base import create_browser_context
 
+    from backend.config import settings
+
+    if settings.active_region == "europe":
+        loc_re = (
+            "London|Manchester|Edinburgh|Birmingham|Bristol|Cambridge|Dublin|"
+            "Berlin|Munich|Amsterdam|United Kingdom|Ireland|Germany|Netherlands|"
+            "Scotland|England|Wales|UK"
+        )
+    else:
+        loc_re = "India|Bengaluru|Bangalore|Hyderabad|Pune|Gurgaon|Noida"
+    # The anchor itself carries no text; the title and location live in the
+    # surrounding card, so walk up from the link.
+    script = (
+        """() => Array.from(
+              document.querySelectorAll('a[href*="/jobs/results/"]'))
+            .filter(a => /\\/jobs\\/results\\/\\d/.test(a.href))
+            .map(a => {
+              const card = a.closest('li, [class*="lLd3Je"], div[jscontroller]') || a.parentElement;
+              const h = card && card.querySelector('h3, [role="heading"]');
+              const text = card ? card.innerText.split('\\n').map(s => s.trim()).filter(Boolean) : [];
+              const loc = text.find(t => /"""
+        + loc_re +
+        """/i.test(t));
+              return {
+                title: (h ? h.innerText : text[0] || '').trim(),
+                location: loc || '',
+                href: a.href,
+              };
+            }).filter(x => x.title && x.href)"""
+    )
+
     found: List[Dict] = []
     try:
         async with async_playwright() as pw:
             browser, ctx = await create_browser_context(pw, headless=headless)
             page = await ctx.new_page()
-            for role in roles:
-                url = (
-                    "https://www.google.com/about/careers/applications/jobs/results/"
-                    f"?q={requests.utils.quote(role)}&location=India"
-                )
-                await page.goto(url, wait_until="networkidle", timeout=70000)
-                await page.wait_for_timeout(9000)
-                await _scroll(page)
-                # The anchor itself carries no text; the title and location live
-                # in the surrounding card, so walk up from the link.
-                cards = await page.evaluate(
-                    """() => Array.from(
-                          document.querySelectorAll('a[href*="/jobs/results/"]'))
-                        .filter(a => /\\/jobs\\/results\\/\\d/.test(a.href))
-                        .map(a => {
-                          const card = a.closest('li, [class*="lLd3Je"], div[jscontroller]') || a.parentElement;
-                          const h = card && card.querySelector('h3, [role="heading"]');
-                          const text = card ? card.innerText.split('\\n').map(s => s.trim()).filter(Boolean) : [];
-                          const loc = text.find(t => /India|Bengaluru|Bangalore|Hyderabad|Pune|Gurgaon|Noida/i.test(t));
-                          return {
-                            title: (h ? h.innerText : text[0] || '').trim(),
-                            location: loc || '',
-                            href: a.href,
-                          };
-                        }).filter(x => x.title && x.href)"""
-                )
-                for card in cards:
-                    if not _is_india(card.get("location", "")):
-                        continue
-                    found.append(normalize_job({
-                        "title": card["title"],
-                        "company": "Google",
-                        "url": card["href"],
-                        "location": card.get("location") or "India",
-                        "jd_text": "",
-                        "easy_apply": False,
-                    }, "bigtech"))
+            for place, _country in _search_places():
+                for role in roles:
+                    url = (
+                        "https://www.google.com/about/careers/applications/jobs/results/"
+                        f"?q={requests.utils.quote(role)}&location={requests.utils.quote(place)}"
+                    )
+                    await page.goto(url, wait_until="networkidle", timeout=70000)
+                    await page.wait_for_timeout(9000)
+                    await _scroll(page)
+                    cards = await page.evaluate(script)
+                    for card in cards:
+                        if not _location_in_region(card.get("location", "")):
+                            continue
+                        found.append(normalize_job({
+                            "title": card["title"],
+                            "company": "Google",
+                            "url": card["href"],
+                            "location": card.get("location") or place,
+                            "jd_text": "",
+                            "easy_apply": False,
+                        }, "bigtech"))
+                        if len(found) >= max_jobs:
+                            break
                     if len(found) >= max_jobs:
                         break
                 if len(found) >= max_jobs:
@@ -252,7 +296,7 @@ async def scrape_google(
     except Exception as exc:  # noqa: BLE001
         logger.warning(f"Google scrape failed: {exc}")
 
-    logger.info(f"Google: {len(found)} India roles")
+    logger.info(f"Google: {len(found)} roles")
     return found
 
 

@@ -14,7 +14,11 @@ from loguru import logger
 
 from backend.scrapers import http
 from backend.scrapers.base import normalize_job
-from backend.scrapers.filter_utils import ENTRY_TITLE_SIGNALS, passes_hard_filters
+from backend.scrapers.filter_utils import (
+    ENTRY_TITLE_SIGNALS,
+    EUROPE_SEARCH_LOCATIONS,
+    passes_hard_filters,
+)
 from backend.scrapers.registry import resolve_discovery_roles
 from backend.scan_control import should_stop
 from backend.config import settings
@@ -250,7 +254,9 @@ def _collect_listings(
                                 "jd_text": "",
                                 "platform": "linkedin",
                             }
-                            ok, _ = passes_hard_filters(preview, require_jd=False)
+                            ok, _ = passes_hard_filters(
+                                preview, require_jd=False, region=settings.active_region,
+                            )
                             if not ok:
                                 continue
 
@@ -286,6 +292,7 @@ def _enrich_listings(listings: List[dict]) -> List[dict]:
         ok, reason = passes_hard_filters(
             job_data,
             require_jd=not _has_entry_title(job_data.get("title", "")),
+            region=settings.active_region,
         )
         if not ok:
             if "JD missing" in reason:
@@ -318,7 +325,10 @@ async def scrape_linkedin_jobs(
     Returns list of normalized job dicts.
     """
     roles = resolve_discovery_roles(roles or settings.target_roles_list)
-    locations = _merge_locations(locations or settings.preferred_locations_list)
+    if settings.active_region == "europe":
+        locations = list(EUROPE_SEARCH_LOCATIONS)
+    else:
+        locations = _merge_locations(locations or settings.preferred_locations_list)
 
     logger.info(f"LinkedIn: searching {len(roles)} roles across {len(locations)} locations")
 

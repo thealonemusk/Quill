@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from backend.applier.ats import detect_ats
 from backend.db.models import Job, SessionLocal
 from backend.scrapers.filter_utils import (
+    EUROPE_PREFERRED_LOCATIONS,
     is_career_listing_eligible,
     passes_hard_filters,
 )
@@ -125,7 +126,8 @@ def upsert_jobs(jobs: list, db: Session) -> int:
                 seen_ledger.record(db, job_data, "filtered", f"Excluded company: {company}", cache=ledger)
                 continue
 
-        ok, reason = passes_hard_filters(job_data, max_years=max_exp_years)
+        region = settings.active_region
+        ok, reason = passes_hard_filters(job_data, max_years=max_exp_years, region=region)
         if not ok:
             logger.info(f"Hard filter excluded [{company} - {title}]: {reason}")
             seen_ledger.record(db, job_data, "filtered", reason, cache=ledger)
@@ -138,10 +140,14 @@ def upsert_jobs(jobs: list, db: Session) -> int:
                 seen_ledger.record(db, job_data, "filtered", reason, cache=ledger)
                 continue
 
+        preferred = (
+            EUROPE_PREFERRED_LOCATIONS if region == "europe"
+            else settings.preferred_locations_list
+        )
         score, fit_reason = score_job(
             job_data,
             target_roles=settings.target_roles_list,
-            preferred_locations=settings.preferred_locations_list,
+            preferred_locations=preferred,
             experience_years=max_exp_years,
         )
         if score < min_score:
@@ -197,12 +203,29 @@ def upsert_jobs(jobs: list, db: Session) -> int:
     return count
 
 
+def _in_active_region(job) -> bool:
+    from backend.scrapers.filter_utils import matches_region
+
+    return matches_region(
+        {
+            "location": job.location or "",
+            "title": job.title or "",
+            "jd_text": job.jd_text or "",
+            "platform": job.platform or "",
+        },
+        settings.active_region,
+    )
+
+
 def purge_visited_jobs(db: Session) -> int:
-    """Remove jobs the user opened (visited) that are still in the review queue."""
-    visited = db.query(Job).filter(
-        Job.visited_at.isnot(None),
-        Job.status.in_(["discovered", "scored", "tailored", "ignored"]),
-    ).all()
+    """Remove jobs the user opened that are still in this region's queue."""
+    visited = [
+        job for job in db.query(Job).filter(
+            Job.visited_at.isnot(None),
+            Job.status.in_(["discovered", "scored", "tailored", "ignored"]),
+        ).all()
+        if _in_active_region(job)
+    ]
     # Mark before deleting: after db.delete the row's URL is no longer readable,
     # and an unrecorded purge is exactly how these jobs came back.
     seen_ledger.mark_removed_jobs(db, visited, "visited", "opened by user")
@@ -218,12 +241,15 @@ def purge_visited_jobs(db: Session) -> int:
 
 
 def purge_stale_discovered_jobs(db: Session, max_age_hours: int = JOB_FRESHNESS_HOURS) -> int:
-    """Remove discovered/scored jobs older than max_age_hours."""
+    """Remove this region's discovered/scored jobs older than max_age_hours."""
     cutoff = datetime.utcnow() - timedelta(hours=max_age_hours)
-    stale = db.query(Job).filter(
-        Job.status.in_(["discovered", "scored"]),
-        Job.discovered_at < cutoff,
-    ).all()
+    stale = [
+        job for job in db.query(Job).filter(
+            Job.status.in_(["discovered", "scored"]),
+            Job.discovered_at < cutoff,
+        ).all()
+        if _in_active_region(job)
+    ]
     # A stale row the user opened stays "visited": expiry is not a decision.
     seen_ledger.mark_removed_jobs(
         db, stale, "expired", f"aged out of the queue after {max_age_hours}h"
@@ -248,6 +274,11 @@ async def run_scan_pipeline(
     Run job discovery: scrape selected platforms, apply filters, store in DB.
     """
     platforms = platforms or list(DEFAULT_SCAN_PLATFORMS)
+    # The dashboard posts the India board list. Europe ignores that and
+    # searches only the sources that can name a UK / IE / DE / NL city.
+    if settings.active_region == "europe":
+        platforms = ["linkedin", "bigtech"]
+        logger.info("Europe region: scanning LinkedIn and Amazon / Microsoft / Google")
     roles = resolve_discovery_roles(settings.target_roles_list)
     logger.info(f"Targeting roles (discovery): {roles}")
     clear_stop()

@@ -1,6 +1,7 @@
 """
 Filter utilities — text parsing and strict experience/title/location checks.
-Hard limits: <= 2 years experience, no frontend-only roles, India-only locations.
+Hard limits: <= 2 years experience, no frontend-only roles.
+Location follows the region: India, or the UK, Ireland, Germany, and the Netherlands.
 """
 
 import re
@@ -325,7 +326,235 @@ def _jd_cued_places(jd: str) -> Tuple[bool, bool]:
     return india, abroad
 
 
-def is_location_allowed(job_data: dict) -> Tuple[bool, str]:
+# Europe mode: the UK, Ireland, Germany, and the Netherlands. "ireland" is not
+# in the UK list; "northern ireland" is masked before the Ireland markers run,
+# so it counts as the UK only.
+_UK_MARKERS = (
+    "united kingdom", "great britain", "northern ireland",
+    "england", "scotland", "wales",
+    "london", "manchester", "edinburgh", "birmingham", "bristol", "cambridge",
+    "glasgow", "leeds", "uk",
+)
+_IRELAND_MARKERS = ("republic of ireland", "dublin", "cork", "galway", "ireland")
+_GERMANY_MARKERS = ("germany", "berlin", "munich", "hamburg", "frankfurt")
+_NETHERLANDS_MARKERS = (
+    "netherlands", "holland", "amsterdam", "rotterdam", "utrecht",
+    "eindhoven", "the hague",
+)
+EUROPE_COUNTRIES = ("united kingdom", "ireland", "germany", "netherlands")
+_EUROPE_MARKER_SET = frozenset(
+    _UK_MARKERS + _IRELAND_MARKERS + _GERMANY_MARKERS + _NETHERLANDS_MARKERS
+)
+# A city, not the country name. "teams span the UK and India" is not a UK role.
+_EUROPE_CITIES = (
+    "london", "manchester", "edinburgh", "birmingham", "bristol", "cambridge",
+    "glasgow", "leeds", "dublin", "cork", "galway", "berlin", "munich",
+    "hamburg", "frankfurt", "amsterdam", "rotterdam", "utrecht", "eindhoven",
+    "the hague",
+)
+# Places the Europe search does not want, and that ABROAD_MARKERS does not
+# already name. Paris would otherwise look like "no country" and fall through.
+_OTHER_COUNTRY_MARKERS = (
+    "france", "paris", "spain", "madrid", "barcelona", "italy", "milan", "rome",
+    "poland", "warsaw", "sweden", "stockholm", "belgium", "brussels",
+    "austria", "vienna", "switzerland", "zurich", "portugal", "lisbon",
+    "denmark", "copenhagen", "finland", "helsinki", "prague", "czechia",
+    "luxembourg", "norway", "oslo", "hungary", "budapest", "greece", "athens",
+    "romania", "bucharest",
+)
+# What LinkedIn and the big-tech boards are asked for. Short on purpose:
+# each city multiplies the request count.
+EUROPE_SEARCH_LOCATIONS = [
+    "London", "Manchester", "Dublin", "Berlin", "Munich", "Amsterdam",
+]
+# Autopilot scores a location by matching these. Anything the allow-list
+# accepts has to hit one of them, or Edinburgh is "out of scope".
+EUROPE_PREFERRED_LOCATIONS = [
+    "United Kingdom", "UK", "England", "Scotland", "Wales", "Northern Ireland",
+    "London", "Manchester", "Edinburgh", "Birmingham", "Bristol", "Cambridge",
+    "Glasgow", "Leeds",
+    "Ireland", "Dublin", "Cork", "Galway",
+    "Germany", "Berlin", "Munich", "Hamburg", "Frankfurt",
+    "Netherlands", "Holland", "Amsterdam", "Rotterdam", "Utrecht", "Eindhoven",
+    "The Hague",
+]
+
+# A sentence that refuses a visa. Neutral mentions ("sponsorship") are not
+# here — a silent description is kept. "or we will sponsor" in the same
+# sentence cancels the refusal.
+_VISA_REFUSAL = (
+    "no visa sponsorship",
+    "visa sponsorship is not available",
+    "visa sponsorship is not offered",
+    "visa sponsorship not available",
+    "sponsorship is not available",
+    "sponsorship is not offered",
+    "do not offer sponsorship",
+    "does not offer sponsorship",
+    "will not sponsor",
+    "cannot sponsor",
+    "can't sponsor",
+    "unable to sponsor",
+    "unable to offer sponsorship",
+    "not able to sponsor",
+    "not willing to sponsor",
+    "cannot provide sponsorship",
+    "do not provide sponsorship",
+    "does not provide sponsorship",
+    "no sponsorship",
+    "must already have the right to work",
+    "must have the right to work",
+    "must already be authorised to work",
+    "must already be authorized to work",
+    "must be authorised to work",
+    "must be authorized to work",
+    "must have unrestricted right to work",
+    "existing right to work",
+    "must hold the right to work",
+    "right to work is required",
+)
+_VISA_OFFER = (
+    "we will sponsor",
+    "we can sponsor",
+    "will sponsor",
+    "can sponsor",
+    "visa sponsorship is available",
+    "visa sponsorship available",
+    "sponsorship is available",
+    "sponsorship available",
+    "offer visa sponsorship",
+    "provide visa sponsorship",
+    "provide sponsorship",
+    "sponsorship can be provided",
+    "happy to sponsor",
+    "willing to sponsor",
+)
+
+
+def europe_countries_in(blob: str) -> set:
+    """Which of the four target countries `blob` names."""
+    low = (blob or "").lower()
+    found = set()
+    if any(_contains_marker(low, m) for m in _UK_MARKERS):
+        found.add("united kingdom")
+    # "northern ireland" contains the word "ireland".
+    masked = low.replace("northern ireland", " ")
+    if any(_contains_marker(masked, m) for m in _IRELAND_MARKERS):
+        found.add("ireland")
+    if any(_contains_marker(low, m) for m in _GERMANY_MARKERS):
+        found.add("germany")
+    if any(_contains_marker(low, m) for m in _NETHERLANDS_MARKERS):
+        found.add("netherlands")
+    return found
+
+
+def europe_location_ok(location: str) -> bool:
+    """The location names one of the four countries and no other."""
+    blob = location or ""
+    return bool(europe_countries_in(blob)) and not _outside_europe(blob)
+
+
+def _outside_europe(blob: str) -> bool:
+    """A country other than the four. Target markers themselves do not count."""
+    low = (blob or "").lower()
+    if any(_contains_marker(low, m) for m in INDIA_MARKERS) or bool(NCR_RE.search(low)):
+        return True
+    for marker in ABROAD_MARKERS:
+        if marker in _EUROPE_MARKER_SET:
+            continue
+        if _contains_marker(low, marker):
+            return True
+    if any(_contains_marker(low, m) for m in _OTHER_COUNTRY_MARKERS):
+        return True
+    return bool(US_STATE_RE.search(blob or ""))
+
+
+def _europe_city_in(blob: str) -> bool:
+    return any(_contains_marker(blob, city) for city in _EUROPE_CITIES)
+
+
+def _jd_cued_europe(jd: str) -> Tuple[bool, bool]:
+    """(target country, somewhere else) named right after a location cue."""
+    europe = other = False
+    for cue in JD_LOCATION_CUE_RE.finditer(jd):
+        window = jd[cue.end():cue.end() + JD_CUE_WINDOW]
+        europe = europe or bool(europe_countries_in(window))
+        other = other or _outside_europe(window)
+    return europe, other
+
+
+def _sponsorship_offered(sentence: str) -> bool:
+    """An offer of sponsorship, not the word sitting inside 'will not sponsor'."""
+    for phrase in _VISA_OFFER:
+        start = 0
+        while True:
+            at = sentence.find(phrase, start)
+            if at < 0:
+                break
+            # "cannot provide sponsorship" contains the offer phrase.
+            before = sentence[max(0, at - 12):at]
+            if not re.search(r"(?:\bcannot|\bnot)\s+$", before):
+                return True
+            start = at + len(phrase)
+    return False
+
+
+def visa_refused(jd_text: str) -> Tuple[bool, str]:
+    """
+    Does the description say they will not sponsor, or that the candidate
+    must already have the right to work? A silent description is not a refusal.
+    An offer in the same sentence ("or we will sponsor") cancels it.
+    """
+    text = re.sub(r"\s+", " ", (jd_text or "").lower()).strip()
+    if not text:
+        return False, ""
+    parts = re.split(r"(?<=[.!?])\s+|\n+", text)
+    sentences = [p.strip() for p in parts if p.strip()] or [text]
+    for sentence in sentences:
+        refusal = next((p for p in _VISA_REFUSAL if p in sentence), "")
+        if refusal and not _sponsorship_offered(sentence):
+            return True, f"Visa refused: '{refusal}'"
+    return False, ""
+
+
+def is_europe_location_allowed(job_data: dict) -> Tuple[bool, str]:
+    """UK, Ireland, Germany, or the Netherlands, and nowhere else."""
+    location = (job_data.get("location") or "").strip()
+    title = job_data.get("title") or ""
+    jd = (job_data.get("jd_text") or "")[:1200].lower()
+    loc = location.lower()
+    shown = location or title
+
+    here = europe_countries_in(loc)
+    elsewhere = _outside_europe(loc)
+    if here and not elsewhere:
+        return True, "UK, Ireland, Germany, or Netherlands"
+    if elsewhere:
+        return False, f"Outside UK, Ireland, Germany, and the Netherlands: '{shown}'"
+
+    cue_here, cue_elsewhere = _jd_cued_europe(jd)
+    if cue_here and not cue_elsewhere:
+        return True, "Europe location (from JD)"
+    if cue_elsewhere:
+        return False, f"Outside Europe (from JD): '{shown}'"
+    # A city in the description, with no other country. The country name alone
+    # ("teams span the UK") does not place the role.
+    if _europe_city_in(jd) and not _outside_europe(jd):
+        return True, "Europe location (from JD)"
+    if not loc:
+        return False, "Missing location"
+    if "remote" in loc or "work from home" in loc or loc in {"wfh", "anywhere", "multiple locations"}:
+        return False, f"Remote outside UK, Ireland, Germany, and the Netherlands: '{location}'"
+    return False, f"Outside UK, Ireland, Germany, and the Netherlands: '{location}'"
+
+
+def is_location_allowed(job_data: dict, region: str = "india") -> Tuple[bool, str]:
+    if region == "europe":
+        return is_europe_location_allowed(job_data)
+    return _india_location_allowed(job_data)
+
+
+def _india_location_allowed(job_data: dict) -> Tuple[bool, str]:
     location = (job_data.get("location") or "").strip()
     title = job_data.get("title") or ""
     jd = (job_data.get("jd_text") or "")[:1200].lower()
@@ -389,10 +618,23 @@ def is_closed_posting(job_data: dict) -> Tuple[bool, str]:
     return False, ""
 
 
+def matches_region(job_data: dict, region: str = "india") -> bool:
+    """Location (and, in Europe, a visa refusal) for rows already stored."""
+    ok, _ = is_location_allowed(job_data, region=region)
+    if not ok:
+        return False
+    if region == "europe":
+        refused, _ = visa_refused(job_data.get("jd_text") or "")
+        if refused:
+            return False
+    return True
+
+
 def passes_hard_filters(
     job_data: dict,
     max_years: float = MAX_JD_EXPERIENCE_YEARS,
     require_jd: bool = True,
+    region: str = "india",
 ) -> Tuple[bool, str]:
     title = job_data.get("title") or ""
     jd = job_data.get("jd_text") or ""
@@ -401,7 +643,11 @@ def passes_hard_filters(
         return False, why
     if is_pure_frontend_role(title, jd):
         return False, f"Frontend role: '{title}'"
-    ok, reason = is_location_allowed(job_data)
+    ok, reason = is_location_allowed(job_data, region=region)
     if not ok:
         return False, reason
+    if region == "europe":
+        refused, why = visa_refused(jd)
+        if refused:
+            return False, why
     return is_job_experience_valid(job_data, max_years=max_years, require_jd=require_jd)

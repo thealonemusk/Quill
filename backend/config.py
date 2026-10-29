@@ -49,6 +49,8 @@ class Settings(BaseSettings):
     target_roles: str = "Software Engineer,Backend Engineer"
     experience_years: int = 2
     preferred_locations: str = "Bengaluru,Remote"
+    # india | europe. Europe is UK, Ireland, Germany, and the Netherlands.
+    target_region: str = "india"
     min_relevance_score: int = 55
     excluded_companies: str = ""
 
@@ -100,6 +102,11 @@ class Settings(BaseSettings):
         if not self.excluded_companies:
             return []
         return [c.strip() for c in self.excluded_companies.split(",")]
+
+    @property
+    def active_region(self) -> str:
+        region = (self.target_region or "").strip().lower()
+        return region if region in {"india", "europe"} else "india"
 
 
 settings = Settings()
