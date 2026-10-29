@@ -457,7 +457,7 @@ def europe_location_ok(location: str) -> bool:
 def _outside_europe(blob: str) -> bool:
     """A country other than the four. Target markers themselves do not count."""
     low = (blob or "").lower()
-    if any(_contains_marker(low, m) for m in INDIA_MARKERS) or bool(NCR_RE.search(low)):
+    if _india_in(low):
         return True
     for marker in ABROAD_MARKERS:
         if marker in _EUROPE_MARKER_SET:
@@ -500,11 +500,7 @@ def _sponsorship_offered(sentence: str) -> bool:
 
 
 def visa_refused(jd_text: str) -> Tuple[bool, str]:
-    """
-    Does the description say they will not sponsor, or that the candidate
-    must already have the right to work? A silent description is not a refusal.
-    An offer in the same sentence ("or we will sponsor") cancels it.
-    """
+    """A refusal to sponsor, unless that same sentence also offers one."""
     text = re.sub(r"\s+", " ", (jd_text or "").lower()).strip()
     if not text:
         return False, ""
@@ -628,6 +624,18 @@ def matches_region(job_data: dict, region: str = "india") -> bool:
         if refused:
             return False
     return True
+
+
+def job_in_region(job, region: str = "india") -> bool:
+    return matches_region(
+        {
+            "location": job.location or "",
+            "title": job.title or "",
+            "jd_text": job.jd_text or "",
+            "platform": job.platform or "",
+        },
+        region,
+    )
 
 
 def passes_hard_filters(

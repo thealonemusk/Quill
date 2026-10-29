@@ -28,6 +28,7 @@ from backend.autopilot.select import company_tier
 from backend.applier.profile import RESUMES_DIR, load_profile, save_profile
 from backend.api.autofill import router as autofill_router
 from backend.api.autopilot import router as autopilot_router
+from backend.scrapers.filter_utils import job_in_region
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 
@@ -104,7 +105,7 @@ app.include_router(autopilot_router)
 @app.on_event("startup")
 async def startup():
     init_db()
-    logger.info("🚀 TempoApply API started")
+    logger.info("TempoApply API started")
 
 
 # ─── Pydantic Schemas ────────────────────────────────────────────────────────
@@ -189,21 +190,6 @@ class ManualJobRequest(BaseModel):
 
 # ─── Jobs Endpoints ──────────────────────────────────────────────────────────
 
-def _job_in_region(job) -> bool:
-    """Hide the other region's rows. They stay in the database."""
-    from backend.scrapers.filter_utils import matches_region
-
-    return matches_region(
-        {
-            "location": job.location or "",
-            "title": job.title or "",
-            "jd_text": job.jd_text or "",
-            "platform": job.platform or "",
-        },
-        settings.active_region,
-    )
-
-
 @app.get("/api/jobs", response_model=List[JobOut])
 def get_jobs(
     status: Optional[str] = Query(None),
@@ -239,7 +225,7 @@ def get_jobs(
             dirty = True
     if dirty:
         db.commit()
-    return [job for job in jobs if _job_in_region(job)]
+    return [job for job in jobs if job_in_region(job, settings.active_region)]
 
 
 @app.get("/api/jobs/{job_id}", response_model=JobOut)
@@ -363,7 +349,7 @@ def clear_discovered_jobs(
 
     jobs_to_delete = [
         job for job in db.query(Job).filter(Job.status.in_(statuses)).all()
-        if _job_in_region(job)
+        if job_in_region(job, settings.active_region)
     ]
 
     # Only a row carrying no decision becomes "cleared". Applied, rejected,
@@ -428,7 +414,7 @@ def purge_experienced_jobs(db: Session = Depends(get_db)):
     for job in all_jobs:
         if job.status in {"applied", "interviewing", "offer"}:
             continue
-        if not _job_in_region(job):
+        if not job_in_region(job, settings.active_region):
             continue
         job_dict = {
             "title": job.title,
@@ -699,7 +685,7 @@ async def start_apply(
         cutoff = datetime.utcnow() - timedelta(hours=JOB_FRESHNESS_HOURS)
         job_ids = [
             j.id for j in eligible_jobs(db)
-            if _job_in_region(j)
+            if job_in_region(j, settings.active_region)
             and (
                 j.status not in ("discovered", "scored")
                 or (j.discovered_at is not None and j.discovered_at >= cutoff)
@@ -783,10 +769,11 @@ def get_analytics(db: Session = Depends(get_db)):
 # ─── Settings ────────────────────────────────────────────────────────────────
 
 def _target_region(new_settings: dict) -> str:
-    """india or europe. A save that omits the field keeps the current one."""
-    if "target_region" not in new_settings or new_settings.get("target_region") in (None, ""):
+    """A save that omits the field keeps the current region."""
+    raw = new_settings.get("target_region")
+    if raw in (None, ""):
         return settings.active_region
-    region = str(new_settings.get("target_region") or "").strip().lower()
+    region = str(raw).strip().lower()
     if region not in {"india", "europe"}:
         raise HTTPException(status_code=400, detail="target_region must be india or europe")
     return region

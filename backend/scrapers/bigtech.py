@@ -24,7 +24,9 @@ from typing import Dict, Iterable, List, Optional
 import requests
 from loguru import logger
 
+from backend.config import settings
 from backend.scrapers.base import normalize_job
+from backend.scrapers.filter_utils import EUROPE_PREFERRED_LOCATIONS, europe_location_ok
 
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -42,8 +44,6 @@ INDIA_TOKENS = ("india", "bengaluru", "bangalore", "hyderabad", "pune", "mumbai"
 
 def _search_places() -> List[tuple]:
     """(location query, Amazon country code) for the active region."""
-    from backend.config import settings
-
     if settings.active_region == "europe":
         return [
             ("United Kingdom", "GBR"),
@@ -55,9 +55,6 @@ def _search_places() -> List[tuple]:
 
 
 def _location_in_region(location: str) -> bool:
-    from backend.config import settings
-    from backend.scrapers.filter_utils import europe_location_ok
-
     if settings.active_region == "europe":
         return europe_location_ok(location)
     return _is_india(location)
@@ -230,36 +227,28 @@ async def scrape_google(
 
     from backend.scrapers.base import create_browser_context
 
-    from backend.config import settings
-
+    # Same names the allow-list accepts. A second, shorter regex dropped cities
+    # the filter would have kept, so the card scan never saw them.
     if settings.active_region == "europe":
-        loc_re = (
-            "London|Manchester|Edinburgh|Birmingham|Bristol|Cambridge|Dublin|"
-            "Berlin|Munich|Amsterdam|United Kingdom|Ireland|Germany|Netherlands|"
-            "Scotland|England|Wales|UK"
-        )
+        loc_re = "|".join(EUROPE_PREFERRED_LOCATIONS)
     else:
         loc_re = "India|Bengaluru|Bangalore|Hyderabad|Pune|Gurgaon|Noida"
     # The anchor itself carries no text; the title and location live in the
     # surrounding card, so walk up from the link.
-    script = (
-        """() => Array.from(
+    script = f"""() => Array.from(
               document.querySelectorAll('a[href*="/jobs/results/"]'))
             .filter(a => /\\/jobs\\/results\\/\\d/.test(a.href))
-            .map(a => {
+            .map(a => {{
               const card = a.closest('li, [class*="lLd3Je"], div[jscontroller]') || a.parentElement;
               const h = card && card.querySelector('h3, [role="heading"]');
               const text = card ? card.innerText.split('\\n').map(s => s.trim()).filter(Boolean) : [];
-              const loc = text.find(t => /"""
-        + loc_re +
-        """/i.test(t));
-              return {
+              const loc = text.find(t => /{loc_re}/i.test(t));
+              return {{
                 title: (h ? h.innerText : text[0] || '').trim(),
                 location: loc || '',
                 href: a.href,
-              };
-            }).filter(x => x.title && x.href)"""
-    )
+              }};
+            }}).filter(x => x.title && x.href)"""
 
     found: List[Dict] = []
     try:

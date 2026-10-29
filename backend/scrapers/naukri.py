@@ -8,7 +8,7 @@ from loguru import logger
 from playwright.async_api import async_playwright
 
 from backend.scrapers.filter_utils import passes_hard_filters
-from backend.scrapers.base import normalize_job
+from backend.scrapers.base import STEALTH_JS, normalize_job
 from backend.scrapers.registry import resolve_discovery_roles
 from backend.scan_control import should_stop
 from backend.config import settings
@@ -28,7 +28,6 @@ CARD_SELECTOR = (
     ".srp-jobtuple-wrapper, .cust-job-tuple, article.jobTuple, "
     "div[class*='jobTuple']"
 )
-STEALTH_JS = "Object.defineProperty(navigator, 'webdriver', { get: () => undefined });"
 
 
 def _merge_locations(locations: List[str]) -> List[str]:

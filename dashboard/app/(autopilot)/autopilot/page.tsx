@@ -129,7 +129,6 @@ export default function AutopilotPage() {
 
   return (
     <div className="page-x mx-auto max-w-6xl space-y-5 pb-16 pt-5 sm:pt-6">
-      {/* running banner */}
       {status?.running && (
         <div className="flex items-center gap-3 rounded-xl border border-[var(--accent)] bg-[var(--surface)] px-5 py-3.5">
           <Loader2 className="h-4 w-4 shrink-0 animate-spin text-[var(--signal-ink)]" />
@@ -150,7 +149,6 @@ export default function AutopilotPage() {
         </div>
       )}
 
-      {/* tabs */}
       <div className="flex items-center gap-2">
         {(['select', 'review'] as const).map((key) => (
           <button
@@ -196,7 +194,10 @@ export default function AutopilotPage() {
                 </span>
                 <select
                   value={minTier}
-                  onChange={(e) => setMinTier(e.target.value as Tier)}
+                  onChange={(e) => {
+                    const next = TIER_ORDER.find((t) => t === e.target.value);
+                    if (next) setMinTier(next);
+                  }}
                   className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--text-secondary)] outline-none"
                 >
                   {TIER_ORDER.map((t) => (

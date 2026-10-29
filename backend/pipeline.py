@@ -15,6 +15,7 @@ from backend.db.models import Job, SessionLocal
 from backend.scrapers.filter_utils import (
     EUROPE_PREFERRED_LOCATIONS,
     is_career_listing_eligible,
+    job_in_region,
     passes_hard_filters,
 )
 from backend.scrapers import http
@@ -203,20 +204,6 @@ def upsert_jobs(jobs: list, db: Session) -> int:
     return count
 
 
-def _in_active_region(job) -> bool:
-    from backend.scrapers.filter_utils import matches_region
-
-    return matches_region(
-        {
-            "location": job.location or "",
-            "title": job.title or "",
-            "jd_text": job.jd_text or "",
-            "platform": job.platform or "",
-        },
-        settings.active_region,
-    )
-
-
 def purge_visited_jobs(db: Session) -> int:
     """Remove jobs the user opened that are still in this region's queue."""
     visited = [
@@ -224,7 +211,7 @@ def purge_visited_jobs(db: Session) -> int:
             Job.visited_at.isnot(None),
             Job.status.in_(["discovered", "scored", "tailored", "ignored"]),
         ).all()
-        if _in_active_region(job)
+        if job_in_region(job, settings.active_region)
     ]
     # Mark before deleting: after db.delete the row's URL is no longer readable,
     # and an unrecorded purge is exactly how these jobs came back.
@@ -248,7 +235,7 @@ def purge_stale_discovered_jobs(db: Session, max_age_hours: int = JOB_FRESHNESS_
             Job.status.in_(["discovered", "scored"]),
             Job.discovered_at < cutoff,
         ).all()
-        if _in_active_region(job)
+        if job_in_region(job, settings.active_region)
     ]
     # A stale row the user opened stays "visited": expiry is not a decision.
     seen_ledger.mark_removed_jobs(

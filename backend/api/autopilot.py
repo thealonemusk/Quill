@@ -29,6 +29,7 @@ from backend.autopilot.select import Tier, select
 from backend.config import settings
 from backend.db.models import Job, SessionLocal, get_db
 from backend.resume.tailor import tailored_pdf
+from backend.scrapers.filter_utils import EUROPE_PREFERRED_LOCATIONS, job_in_region
 
 router = APIRouter(prefix="/api/autopilot", tags=["autopilot"])
 
@@ -87,20 +88,10 @@ def candidates(
     """
     # Rejected and ignored are decisions, not a queue: re-selecting them
     # re-filled jobs the user had closed, and "tailored" overwrote the status.
-    from backend.scrapers.filter_utils import EUROPE_PREFERRED_LOCATIONS, matches_region
-
     region = settings.active_region
     jobs = [
         job for job in db.query(Job).filter(~Job.status.in_(CLOSED_STATUSES)).all()
-        if matches_region(
-            {
-                "location": job.location or "",
-                "title": job.title or "",
-                "jd_text": job.jd_text or "",
-                "platform": job.platform or "",
-            },
-            region,
-        )
+        if job_in_region(job, region)
     ]
     preferred = (
         EUROPE_PREFERRED_LOCATIONS if region == "europe"
