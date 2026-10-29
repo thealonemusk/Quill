@@ -323,7 +323,7 @@ export default function JobsPage() {
             </div>
             {region === 'europe' && (
               <p className="mt-2 text-sm text-[var(--text-secondary)]">
-                UK, Ireland, Germany, Netherlands. Posts that refuse a visa are hidden.
+                UK, Ireland, Germany, Netherlands. Known visa sponsors only, eight jobs per company.
               </p>
             )}
             <div className="mt-3 flex flex-wrap gap-1.5">

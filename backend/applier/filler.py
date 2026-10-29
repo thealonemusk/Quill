@@ -41,7 +41,7 @@ SKIP_APPLY_SUBSTRINGS = (
 )
 NEXT_NAMES = ("Next", "Continue", "Save and continue", "Save & Continue")
 
-# TempoApply never submits. Filling is automated; the final click is the
+# Quill never submits. Filling is automated; the final click is the
 # user's, because a mis-parsed field that reaches an employer cannot be
 # recalled. There is deliberately no submit helper in this module: every
 # button click goes through `click_named_button`, which refuses anything that
@@ -918,7 +918,7 @@ async def finish_application(
     # Never submitted, whatever `auto_submit` says. The flag survives only so
     # old callers and saved profiles do not break; it has no effect.
     if auto_submit or profile.auto_submit:
-        logger.warning("auto_submit was requested and ignored: TempoApply never submits")
+        logger.warning("auto_submit was requested and ignored: Quill never submits")
     await screenshot_failure(page, log_dir / f"{job_id}-filled.png")
     if await captcha_present(page):
         return apply_result("needs_review", "Form filled; a CAPTCHA is waiting — review and submit it yourself.", filled_info)

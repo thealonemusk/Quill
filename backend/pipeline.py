@@ -264,8 +264,11 @@ async def run_scan_pipeline(
     # The dashboard posts the India board list. Europe ignores that and
     # searches only the sources that can name a UK / IE / DE / NL city.
     if settings.active_region == "europe":
-        platforms = ["linkedin", "bigtech"]
-        logger.info("Europe region: scanning LinkedIn and Amazon / Microsoft / Google")
+        # Separate tasks so Amazon jobs are stored as soon as that search
+        # returns. One combined task hid them until the Microsoft and Google
+        # browsers finished, which is why a Europe scan looked empty.
+        platforms = ["linkedin", "amazon", "microsoft", "google"]
+        logger.info("Europe region: scanning LinkedIn, Amazon, Microsoft and Google")
     roles = resolve_discovery_roles(settings.target_roles_list)
     logger.info(f"Targeting roles (discovery): {roles}")
     clear_stop()

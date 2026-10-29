@@ -265,7 +265,7 @@ def _headline_edit(
 ) -> Optional[tuple[str, str]]:
     """
     Swap the summary's opening for the author-written headline closest to this
-    role. The options come from a `% tempoapply-headlines:` comment in the
+    role. The options come from a `% Quill-headlines:` comment in the
     master — the author states what is true, the code only chooses. Returns
     (old, new) or None when the current opening is already the best fit.
     """

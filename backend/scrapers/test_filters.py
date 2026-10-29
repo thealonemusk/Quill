@@ -5,7 +5,7 @@ Every "must pass" case below was a real job the filters threw away, and every
 "must reject" case is a guard that the fix did not loosen what the filters are
 for: 0-2 years, no senior titles, India only, no body shops.
 
-Nothing here touches the network or tempoapply.db: DB checks run against an
+Nothing here touches the network or Quill.db: DB checks run against an
 in-memory SQLite database, and the apply-all check stubs out the apply run.
 
 Run:  python backend/scrapers/test_filters.py
@@ -82,6 +82,7 @@ def test_europe() -> None:
             {
                 "location": location,
                 "title": "Software Engineer",
+                "company": "Stripe",
                 "jd_text": jd,
                 "platform": "linkedin",
             },
@@ -525,9 +526,9 @@ def test_clear_region() -> None:
     db = Session()
     db.add(Job(id="in", title="SE", company="A", platform="linkedin",
                url="https://in.example/1", location="Bengaluru", status="discovered"))
-    db.add(Job(id="eu", title="SE", company="B", platform="linkedin",
+    db.add(Job(id="eu", title="SE", company="Stripe", platform="linkedin",
                url="https://eu.example/1", location="London, United Kingdom", status="discovered"))
-    db.add(Job(id="eu-vis", title="SE", company="B", platform="linkedin",
+    db.add(Job(id="eu-vis", title="SE", company="Stripe", platform="linkedin",
                url="https://eu.example/2", location="Berlin, Germany",
                status="discovered", visited_at=datetime.utcnow()))
     db.commit()
@@ -559,8 +560,72 @@ def test_clear_region() -> None:
         db.close()
 
 
+def test_europe_sponsors() -> None:
+    from backend.autopilot.select import cap_jobs_per_company, sponsors_europe_visa
+    from backend.scrapers.filter_utils import passes_hard_filters
+    from backend.scrapers.linkedin import europe_sponsor_queries
+
+    check("Amazon sponsors", sponsors_europe_visa("Amazon"), True)
+    check("Stripe sponsors", sponsors_europe_visa("Stripe"), True)
+    check("Helsing sponsors", sponsors_europe_visa("Helsing"), True)
+    check("Booking.com sponsors", sponsors_europe_visa("Booking.com"), True)
+    check("a recruiter is not a sponsor", sponsors_europe_visa("Harnham"), False)
+    check("CHECK24 is not on the sponsor list", sponsors_europe_visa("CHECK24"), False)
+    dropped = passes_hard_filters(
+        {
+            "title": "Software Engineer",
+            "company": "Harnham",
+            "location": "London, United Kingdom",
+            "jd_text": "We are hiring.",
+            "platform": "linkedin",
+        },
+        region="europe",
+        require_jd=False,
+    )
+    check("recruiter dropped in Europe", dropped[0], False)
+    rows = [{"company": "Amazon", "score": 100 - i} for i in range(10)]
+    rows.append({"company": "Stripe", "score": 1})
+    capped = cap_jobs_per_company(rows)
+    check("eight Amazon jobs at most", sum(1 for r in capped if r["company"] == "Amazon"), 8)
+    check("Stripe survives the Amazon cap", any(r["company"] == "Stripe" for r in capped), True)
+    queries = europe_sponsor_queries("Software Engineer")
+    check("sponsor search stays bounded", len(queries) <= 72, True)
+    check("Amazon is not a LinkedIn query", all("amazon" not in q[0] for q in queries), True)
+    check("Booking is searched", any("booking" in q[0] for q in queries), True)
+
+
+def test_europe_scan_bounds() -> None:
+    from backend.scrapers.company_careers import _role_matches
+    from backend.scrapers.linkedin import linkedin_page_count
+    from backend.scrapers.registry import resolve_roles
+
+    check("europe linkedin is one page", linkedin_page_count("europe"), 1)
+    check("india linkedin stays three pages", linkedin_page_count("india"), 3)
+    roles = ["Software Engineer", "Backend Engineer"]
+    check(
+        "pricing analyst is not a software title",
+        _role_matches("Pricing Analyst, AWS Monetization", roles),
+        False,
+    )
+    check(
+        "cloud support is not a software title",
+        _role_matches("Cloud Support Associate", roles),
+        False,
+    )
+    check(
+        "software dev engineer matches",
+        _role_matches("Software Dev Engineer - Big Data Processing", roles),
+        True,
+    )
+    short = resolve_roles(["Software Engineer"])
+    check("target role is kept", "Software Engineer" in short, True)
+    check("discovery extras stay off the short list", "Data Engineer" not in short, True)
+
+
 def main() -> None:
     test_europe()
+    test_europe_sponsors()
+    test_europe_scan_bounds()
     test_location()
     test_titles()
     test_experience()

@@ -744,7 +744,7 @@ WORKDAY_REACT_HTML = """
 
     // React's props, exactly where React puts them.
     var input = document.getElementById('sk');
-    input['__reactProps$tempoapply'] = {
+    input['__reactProps$Quill'] = {
       onKeyDown: function (e) {
         if (!e || e.key !== 'Tab') return;
         var v = ((e.target && e.target.value) || '').trim();
@@ -1190,7 +1190,7 @@ WORKDAY_PROMPT_EVIDENCE_HTML = """
       document.body.appendChild(pop);
     };
     window.killPopups = killPopups;
-    document.getElementById('sk')['__reactProps$tempoapply'] = {
+    document.getElementById('sk')['__reactProps$Quill'] = {
       onKeyDown: function (e) {
         if (!e || e.key !== 'Tab') return;
         if (window.__mode === 'owned') {
@@ -1509,7 +1509,7 @@ async def run_widget_lifecycle() -> None:
                  W.mount(handlers());
                  const h = handlers();
                  const press = (sel) => {
-                   const host = document.getElementById('tempoapply-widget-host');
+                   const host = document.getElementById('Quill-widget-host');
                    if (host) host.shadowRoot.querySelector(sel).click();
                  };
                  press('[data-fill]');
@@ -1520,7 +1520,7 @@ async def run_widget_lifecycle() -> None:
                  const reopened = W.isMounted();
                  press('[data-fill]');
                  return { first, second, afterMounts, closed, again, reopened, total: clicks,
-                          hosts: document.querySelectorAll('#tempoapply-widget-host').length };
+                          hosts: document.querySelectorAll('#Quill-widget-host').length };
                }"""
         )
         # Reverting: three mounts wire three click listeners, and a closed
@@ -1550,7 +1550,7 @@ async def run_tailor_button() -> None:
     from playwright.async_api import async_playwright
 
     print("\nTailor resume — finding the description, starting and polling a run")
-    shadow = "document.getElementById('tempoapply-widget-host').shadowRoot"
+    shadow = "document.getElementById('Quill-widget-host').shadowRoot"
 
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
@@ -1662,7 +1662,7 @@ async def run_content_orchestration() -> None:
         await _load_content(page)
         await page.wait_for_timeout(1300)          # watch() -> mount after its quiet spell
 
-        shadow = "document.getElementById('tempoapply-widget-host').shadowRoot"
+        shadow = "document.getElementById('Quill-widget-host').shadowRoot"
         state = await page.evaluate(
             f"""() => ({{ mounted: window.__TA.widget.isMounted(), pings: window.__count('ping') }})"""
         )
@@ -1676,7 +1676,7 @@ async def run_content_orchestration() -> None:
             await page.wait_for_timeout(900)
         state = await page.evaluate(
             """() => ({ mounted: window.__TA.widget.isMounted(), pings: window.__count('ping'),
-                        hosts: document.querySelectorAll('#tempoapply-widget-host').length })"""
+                        hosts: document.querySelectorAll('#Quill-widget-host').length })"""
         )
         check("closed panel stays closed", state["mounted"], False)
         check("no ping per DOM mutation", state["pings"], 1)
@@ -1685,7 +1685,7 @@ async def run_content_orchestration() -> None:
         await page.wait_for_timeout(200)
         state = await page.evaluate(
             """() => ({ mounted: window.__TA.widget.isMounted(), pings: window.__count('ping'),
-                        hosts: document.querySelectorAll('#tempoapply-widget-host').length })"""
+                        hosts: document.querySelectorAll('#Quill-widget-host').length })"""
         )
         # Reverting the host reset: Show after a close does nothing.
         check("Show brings the panel back", state["mounted"], True)
@@ -1857,7 +1857,7 @@ async def run_real_extension_worlds() -> None:
             await page.goto(f"http://127.0.0.1:{port}/wd.html")
             await page.wait_for_timeout(2500)
             ours = [c for c in contexts
-                    if c.get("auxData", {}).get("type") == "isolated" and "TempoApply" in c.get("name", "")]
+                    if c.get("auxData", {}).get("type") == "isolated" and "Quill" in c.get("name", "")]
             check("content script world found", bool(ours), True)
             if not ours:
                 return
@@ -1908,9 +1908,9 @@ async def run_integration() -> None:
 
             print("\nIntegration — real extension, form inside an iframe")
             check("service worker running", len(ctx.service_workers), 1)
-            check("widget mounted from iframe", await page.locator("#tempoapply-widget-host").count(), 1)
+            check("widget mounted from iframe", await page.locator("#Quill-widget-host").count(), 1)
 
-            panel = page.locator("#tempoapply-widget-host").locator("css=.panel")
+            panel = page.locator("#Quill-widget-host").locator("css=.panel")
             check("backend connected", await panel.locator("[data-dot]").get_attribute("class"), "up")
 
             await panel.locator("[data-fill]").click()
@@ -1947,7 +1947,7 @@ async def run_integration() -> None:
 # The harness forms stand in for real postings the scanner found, which are
 # India-located. Their URLs are registered as such jobs in a throwaway
 # database, so "Will you require sponsorship?" resolves exactly as it would on
-# a real application — and the suite never reads or writes tempoapply.db.
+# a real application — and the suite never reads or writes Quill.db.
 HARNESS_JOBS = (
     ("https://acme.wd5.myworkdayjobs.com/en-US/careers/job/Backend-Engineer_R-1/apply", "Bengaluru, Karnataka"),
     ("https://acme.wd5.myworkdayjobs.com/x/apply", "Bengaluru, Karnataka"),

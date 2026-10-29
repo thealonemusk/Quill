@@ -1,4 +1,4 @@
-# TempoApply — working notes
+# Quill — working notes
 
 Read this before changing anything. It records decisions and traps that are not
 visible from the code, and the state of work in progress.
@@ -121,6 +121,46 @@ scripts/audit.py               repo health; run it before declaring anything don
 - **Honeypots are skipped, not blanked.** `is_skip_field()` returns
   `action="skip"`; the extension skips at `fill.js:257`. Intel's form has a
   `beecatcher` field that silently discards the application if filled.
+- **`TARGET_REGION` is `india` or `europe`, and the other region's rows stay
+  stored.** Europe means the UK, Ireland, Germany, and the Netherlands. The
+  Jobs page toggle writes the setting. A save that omits `target_region`
+  keeps the current value; anything else is read back as `india`
+  (`settings.active_region`). The jobs list, autopilot candidates, apply-all,
+  clear, purge-visited, and purge-experienced all go through `job_in_region`,
+  so clearing India leaves the London and Berlin rows where they are.
+
+  The matchers have the India filter's traps, and a few more. "northern
+  ireland" contains "ireland", so the Ireland markers run only after that
+  phrase is masked — Belfast is the UK only. A country name in prose ("teams
+  span the UK") does not place the role; a city does. Paris is not in
+  `ABROAD_MARKERS`, so without `_OTHER_COUNTRY_MARKERS` it looked like no
+  country and fell through. A description that never mentions a visa is kept.
+  A sentence that refuses one is dropped, unless that same sentence also
+  offers sponsorship. "cannot provide sponsorship" contains the offer phrase,
+  so the words in front of it are what decide.
+
+  `APPLY_REGION` defaults to `india` and is set with `JOB_LOCATION` by the
+  apply engine and `/api/autofill/resolve`. In Europe mode a London or Berlin
+  sponsorship question is Yes and authorisation is No: he needs a visa in
+  those four countries. A US question stays blank. In India mode London stays
+  blank. "London" is not in `COUNTRY_NAMES`; `europe_countries_in` maps the
+  city. A caller that sets the job location and forgets the region answers
+  the UK under India rules.
+
+  Europe search is small on purpose. LinkedIn asks six cities
+  (`EUROPE_SEARCH_LOCATIONS`), one page, the settings roles only — not the
+  discovery extras — and at most 40 listings. The extras times six cities
+  never finished, so the queue stayed empty until every description came
+  back. `EUROPE_PREFERRED_LOCATIONS` is both the scoring list and the regex
+  Google uses to read a card. A shorter regex dropped Hamburg and Cork
+  before the allow-list could see them. A city the allow-list accepts has to
+  be on that list, or Edinburgh scores as out of scope. The Europe scan
+  ignores the dashboard's India board list and runs LinkedIn, Amazon,
+  Microsoft, and Google as separate tasks. One combined `bigtech` task hid
+  Amazon until the Microsoft and Google browsers finished, and the scan
+  looked empty. `passes_hard_filters` defaults to `india`. Naukri and company
+  careers still call it that way, and they are not on the Europe scan. A new
+  caller has to pass `region`.
 
 ## Workday's widgets do not work the way they look
 
@@ -142,7 +182,7 @@ from *assumed* Workday markup and passes regardless — it is not evidence.
   isolated world, which shares the DOM but not the page's JS properties, so
   `__reactProps$…` is simply absent there. `src/react-bridge.js` runs in the
   page world (`"world": "MAIN"` in the manifest) and makes the call when
-  `fill.js` asks through a `tempoapply:react` event. Until 2026-09-25 fill.js
+  `fill.js` asks through a `Quill:react` event. Until 2026-09-25 fill.js
   read the props itself, so on every live tenant Skills fell back to typing,
   while every suite stayed green, because `add_script_tag` injects into the
   *page* world. `run_real_extension_worlds` (`--integration`) runs the fixture
@@ -195,7 +235,7 @@ python extension/test/run_tests.py            # 182
 python extension/test/run_tests.py --integration   # real Chrome
 ```
 
-**No test may touch `tempoapply.db` or `config/`.** Every suite that goes
+**No test may touch `Quill.db` or `config/`.** Every suite that goes
 through the API installs an in-memory database via `app.dependency_overrides`.
 An early `test_api_security.py` probed the origin check with
 `/purge-visited` against the real DB — harmless only because nothing was in
@@ -254,6 +294,20 @@ After changing the extension: reload it at `chrome://extensions`, then
 hard-refresh any job tab already open — the old content script stays resident
 in those pages.
 
+## State as of 2026-10-29
+
+The Jobs page switches `TARGET_REGION`. India scans are the boards they were.
+Europe scans LinkedIn plus Amazon, Microsoft, and Google, and both regions
+share the jobs table. `test_europe` and `test_clear_region` in
+`test_filters.py`, and the Europe cases in `test_fields.py`, passed on this
+date. The rest of the Verification list was not re-run.
+
+Google and Microsoft are still browser scrapes. The September note that
+Google returns nothing is about the old selectors; the card reader is now
+region-aware, and nobody has confirmed either board against a live Europe
+page. Company-career boards and Naukri stay on the India scan. Their filters
+still default to `region="india"`.
+
 ## State as of 2026-09-24 — after the full review
 
 A five-way review found, and this pass fixed, with a revert-verified check for
@@ -273,7 +327,8 @@ require sponsorship?") means the job's country: `fields.JOB_LOCATION` is set
 per job by the engine and per request by `/api/autofill/resolve`. A known
 India-located job answers from the profile; a job abroad answers
 authorisation "No" and leaves sponsorship blank; an unknown page leaves both
-blank. Blank beats false.
+blank. Blank beats false. Europe mode (2026-10-29) is the exception for the
+UK, Ireland, Germany, and the Netherlands — the region decision above.
 
 Tailoring runs on OpenRouter (`LLM_PROVIDER=openrouter`, model
 `openrouter/free`, which routes to whichever free model has capacity). Its

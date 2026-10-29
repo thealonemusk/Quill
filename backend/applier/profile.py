@@ -100,7 +100,7 @@ class ApplicantProfile:
     )
     custom_answers: Dict[str, str] = field(default_factory=dict)
     resume_path: str = "resumes/resume.pdf"
-    auto_submit: bool = False  # ignored: TempoApply never submits
+    auto_submit: bool = False  # ignored: Quill never submits
 
     def split_name(self) -> None:
         if self.first_name and self.last_name:
@@ -290,7 +290,7 @@ def save_profile(updates: Dict[str, Any]) -> ApplicantProfile:
         if key == "resume_path" and value and safe_resume_path(str(value)) is None:
             raise ValueError("resume_path must be a .pdf, .doc or .docx inside resumes/")
         if key == "auto_submit":
-            value = False                 # TempoApply never submits
+            value = False                 # Quill never submits
         if key in current:
             current[key] = value
     PROFILE_PATH.parent.mkdir(parents=True, exist_ok=True)

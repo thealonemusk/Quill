@@ -1,10 +1,10 @@
-# TempoApply Autofill — browser extension
+# Quill Autofill — browser extension
 
 A Simplify-style autofill panel for job applications. Open any application form,
 click **Autofill**, review what it wrote, submit it yourself.
 
 The extension holds no data and no rules. It scrapes the form, sends the labels
-to the TempoApply backend, and writes back the values it gets — so the answers
+to the Quill backend, and writes back the values it gets — so the answers
 come from the same `backend/applier/fields.py` resolver that drives the headless
 auto-apply. Tune an alias or a custom answer once and both paths improve.
 
@@ -67,7 +67,7 @@ scrape to zero fields, so the panel detects the stage and shows what to do:
 | Stage | Panel shows |
 | --- | --- |
 | The chooser | **Use My Last Application** (primary), Autofill with Resume, Apply Manually — clicking one opens the form and the panel follows along |
-| Create Account / Sign In | "Sign in first. TempoApply never fills passwords." No fill is attempted |
+| Create Account / Sign In | "Sign in first. Quill never fills passwords." No fill is attempted |
 | A wizard step | A `Step 3 of 6 · My Experience` chip and the normal Autofill button |
 
 **Use My Last Application** is the recommended first choice: Workday carries

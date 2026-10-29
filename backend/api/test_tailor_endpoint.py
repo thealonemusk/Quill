@@ -4,7 +4,7 @@ extension is told.
 
 The tailor itself is stubbed — this checks the endpoint's decisions, not the
 resume pipeline (backend/resume/test_resume.py does that). Everything runs on
-an in-memory database; nothing touches tempoapply.db or spends LLM quota.
+an in-memory database; nothing touches Quill.db or spends LLM quota.
 
 Run:  python backend/api/test_tailor_endpoint.py
 """

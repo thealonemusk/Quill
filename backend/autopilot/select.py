@@ -132,7 +132,30 @@ def _prep(names: Iterable[str]) -> List[str]:
     return sorted({_norm(n) for n in names if _norm(n)})
 
 
+# Employers with a public record of sponsoring a Skilled Worker visa (UK),
+# a Critical Skills permit (Ireland), an EU Blue Card (Germany), or a highly
+# skilled migrant permit (Netherlands) for engineers. Not the government
+# register — the names international candidates actually get sponsored by.
+# Amazon is on it, and is also capped, because one employer was the whole list.
+EUROPE_VISA_SPONSORS = (
+    # Search walks this order and stops after a fixed number of requests,
+    # so the names international candidates actually get sponsored by come first.
+    "google", "deepmind", "meta", "apple", "microsoft", "stripe", "spotify",
+    "revolut", "wise", "bloomberg", "arm", "booking", "adyen", "zalando",
+    "sap", "asml", "helsing", "databricks", "palantir", "uber", "nvidia",
+    "monzo", "celonis", "personio", "n26", "philips", "mollie", "tomtom",
+    "amazon", "netflix",
+    "jane street", "optiver", "citadel", "goldman sachs", "jpmorgan",
+    "j.p. morgan", "morgan stanley", "de shaw", "two sigma", "imc", "flow traders",
+    "ibm", "intel", "qualcomm", "oracle", "cisco", "salesforce", "adobe",
+    "atlassian", "hubspot", "workday", "intercom", "tiktok",
+    "cloudflare", "datadog", "snowflake", "mongodb", "elastic", "gitlab",
+    "twilio", "reddit", "coinbase", "openai", "anthropic", "linkedin",
+)
+EUROPE_JOBS_PER_COMPANY = 8
+
 _FAANG, _ELITE, _STRONG, _KNOWN = (_prep(s) for s in (FAANG, ELITE, STRONG, KNOWN))
+_EUROPE_SPONSORS = _prep(EUROPE_VISA_SPONSORS)
 _AMBIGUOUS = set(_prep(AMBIGUOUS_NAMES))
 _EXCLUDED_STEMS = tuple(_clean(m) for m in EXCLUDED_STEMS)
 _EXCLUDED_MARKERS = tuple(_clean(m) for m in EXCLUDED_MARKERS)
@@ -151,6 +174,28 @@ def _in_set(name: str, names: Iterable[str]) -> bool:
         if _has_word(clean, candidate):
             return True
     return False
+
+
+def sponsors_europe_visa(company: str) -> bool:
+    """True when this employer is known to sponsor a work visa in the UK or EU."""
+    return bool(company) and _in_set(company, _EUROPE_SPONSORS)
+
+
+def cap_jobs_per_company(jobs, limit: int = EUROPE_JOBS_PER_COMPANY):
+    """Keep the highest-scored rows. The list must already be score-descending."""
+    counts: Dict[str, int] = {}
+    kept = []
+    for job in jobs:
+        if isinstance(job, dict):
+            name = job.get("company") or ""
+        else:
+            name = getattr(job, "company", "") or ""
+        key = _norm(name) or name.lower()
+        if counts.get(key, 0) >= limit:
+            continue
+        counts[key] = counts.get(key, 0) + 1
+        kept.append(job)
+    return kept
 
 
 def company_tier(company: str) -> Tier:

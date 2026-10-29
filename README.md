@@ -1,6 +1,6 @@
-# TempoApply — Entry-Level Job Search Engine
+# Quill — Job Search Engine
 
-Automated multi-platform job discovery for early-career software roles. Scrapes LinkedIn, Indeed, Naukri, InstaHyre, and company career sites (Greenhouse, Lever, Workday), with hard filters for experience and senior titles.
+Automated multi-platform job discovery for early-career software roles. The Jobs page switches the search between India and Europe (the UK, Ireland, Germany, and the Netherlands). Hard filters drop senior titles, roles asking for more than two years, and locations outside the region you picked.
 
 ## Quick start
 
@@ -30,29 +30,30 @@ UI: `http://localhost:3000`
 
 ## Platforms
 
-Default scan runs: **LinkedIn** and **company_careers** (direct career sites).
+**India** (the default) scans LinkedIn, Naukri, and company career sites (Greenhouse, Lever, Ashby, Workday).
 
-Optional scrapers (Indeed, Naukri, InstaHyre, Wellfound) remain in the codebase but are not part of the default scan.
+**Europe** ignores that list. It searches LinkedIn, Amazon, Microsoft, and Google for the UK, Ireland, Germany, and the Netherlands, and hides a posting that says it will not sponsor a visa. Clearing the list, or removing jobs you have already opened, leaves the other region in the database.
 
-Platform list is defined once in `backend/platforms.py` and exposed via `GET /api/settings`.
+Indeed, InstaHyre, and Wellfound stay in the codebase and run only when a scan asks for them. The platform list is `backend/platforms.py`, exposed via `GET /api/settings`. `TARGET_REGION` in `config/env.template` is `india` or `europe`.
 
 ## Architecture
 
 ```
-TempoApply/
+Quill/
 ├── run.py
 ├── backend/
 │   ├── platforms.py           # Single source of truth for scan platforms
 │   ├── pipeline.py            # Scan orchestrator + job upsert
 │   ├── scrapers/
 │   │   ├── registry.py        # Platform → scraper mapping
-│   │   ├── filter_utils.py    # Experience & title filters
+│   │   ├── filter_utils.py    # Experience, title, and region filters
 │   │   ├── linkedin.py
-│   │   ├── indeed.py
+│   │   ├── indeed.py          # Optional
 │   │   ├── naukri.py
-│   │   ├── instahyre.py
-│   │   ├── wellfound.py       # Optional (not in default scan)
-│   │   └── company_careers.py # Greenhouse / Lever / Workday
+│   │   ├── instahyre.py       # Optional
+│   │   ├── wellfound.py       # Optional
+│   │   ├── company_careers.py # Greenhouse / Lever / Ashby / Workday
+│   │   └── bigtech.py         # Amazon, Microsoft, Google
 │   ├── applier/
 │   │   ├── fields.py          # Label → value resolver (shared by both apply paths)
 │   │   ├── filler.py          # Playwright form filling
@@ -114,7 +115,8 @@ python scripts/check_ai_key.py     # is the tailoring key usable
 
 ## Features
 
-- Hard experience boundary (<2 years) and senior title exclusion
+- India / Europe switch on the Jobs page; the other region is kept when you clear
+- Hard experience boundary (<2 years), senior title exclusion, and region location checks
 - Multi-platform parallel scraping via registry
 - Apple-inspired dashboard with light/dark mode
 - Assisted autofill on any job portal via the browser extension

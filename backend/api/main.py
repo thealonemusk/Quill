@@ -1,5 +1,5 @@
 """
-FastAPI REST API for TempoApply dashboard.
+FastAPI REST API for Quill dashboard.
 """
 import asyncio
 import re
@@ -24,7 +24,7 @@ from backend import seen_ledger
 from backend.config import settings
 from backend.platforms import DEFAULT_SCAN_PLATFORMS, SCAN_PLATFORMS, ALL_PLATFORMS
 from backend.applier.ats import detect_ats
-from backend.autopilot.select import company_tier
+from backend.autopilot.select import cap_jobs_per_company, company_tier
 from backend.applier.profile import RESUMES_DIR, load_profile, save_profile
 from backend.api.autofill import router as autofill_router
 from backend.api.autopilot import router as autopilot_router
@@ -39,7 +39,7 @@ def _env_path() -> Path:
         path = PROJECT_ROOT / ".env"
     return path
 
-app = FastAPI(title="TempoApply API", version="1.0.0")
+app = FastAPI(title="Quill API", version="1.0.0")
 
 DASHBOARD_ORIGINS = ["http://localhost:3000", "http://127.0.0.1:3000"]
 
@@ -90,12 +90,12 @@ async def local_only(request, call_next):
 
     host = (request.url.hostname or "").lower()
     if host not in _LOCAL_HOSTS:
-        return JSONResponse({"detail": "TempoApply only answers on localhost"}, status_code=403)
+        return JSONResponse({"detail": "Quill only answers on localhost"}, status_code=403)
     origin = request.headers.get("origin")
     if request.method not in _SAFE_METHODS and origin:
         allowed = origin in DASHBOARD_ORIGINS or _EXTENSION_ORIGIN.match(origin)
         if not allowed:
-            return JSONResponse({"detail": f"Origin {origin} may not change TempoApply"}, status_code=403)
+            return JSONResponse({"detail": f"Origin {origin} may not change Quill"}, status_code=403)
     return await call_next(request)
 
 app.include_router(autofill_router)
@@ -105,7 +105,7 @@ app.include_router(autopilot_router)
 @app.on_event("startup")
 async def startup():
     init_db()
-    logger.info("TempoApply API started")
+    logger.info("Quill API started")
 
 
 # ─── Pydantic Schemas ────────────────────────────────────────────────────────
@@ -166,7 +166,7 @@ class StatusUpdate(BaseModel):
 
 class ApplyRequest(BaseModel):
     job_ids: Optional[List[str]] = None
-    auto_submit: bool = False  # ignored: TempoApply never submits
+    auto_submit: bool = False  # ignored: Quill never submits
     headless: bool = False
 
 
@@ -225,7 +225,12 @@ def get_jobs(
             dirty = True
     if dirty:
         db.commit()
-    return [job for job in jobs if job_in_region(job, settings.active_region)]
+    visible = [job for job in jobs if job_in_region(job, settings.active_region)]
+    if settings.active_region == "europe":
+        # Amazon alone was most of the Europe list. Eight per employer
+        # leaves room for the other sponsors.
+        visible = cap_jobs_per_company(visible)
+    return visible
 
 
 @app.get("/api/jobs/{job_id}", response_model=JobOut)

@@ -27,6 +27,7 @@ from loguru import logger
 from backend.config import settings
 from backend.scrapers.base import normalize_job
 from backend.scrapers.filter_utils import EUROPE_PREFERRED_LOCATIONS, europe_location_ok
+from backend.scan_control import should_stop
 
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -52,6 +53,12 @@ def _search_places() -> List[tuple]:
             ("Netherlands", "NLD"),
         ]
     return [("India", "IND")]
+
+
+def _title_ok(title: str, roles: Iterable[str]) -> bool:
+    """Amazon's search returns support and analyst roles for a software query."""
+    from backend.scrapers.company_careers import _role_matches
+    return _role_matches(title, list(roles))
 
 
 def _location_in_region(location: str) -> bool:
@@ -97,9 +104,15 @@ def scrape_amazon(
     seen: set[str] = set()
 
     for place, country in _search_places():
+        if should_stop():
+            break
         for role in roles:
+            if should_stop():
+                return found
             offset = 0
             while len(found) < max_jobs:
+                if should_stop():
+                    return found
                 params = {
                     "base_query": role,
                     "loc_query": place,
@@ -114,6 +127,11 @@ def scrape_amazon(
                         logger.warning(f"Amazon search HTTP {resp.status_code} for {role!r} in {place}")
                         break
                     payload = resp.json()
+                except requests.exceptions.ConnectionError as exc:
+                    # DNS failure is the host, not this one query. Walking every
+                    # role and country turns one outage into a scan that stores nothing.
+                    logger.warning(f"Amazon search unreachable: {exc}")
+                    return found
                 except Exception as exc:  # noqa: BLE001 - one bad role must not kill the scan
                     logger.warning(f"Amazon search failed for {role!r} in {place}: {exc}")
                     break
@@ -131,6 +149,8 @@ def scrape_amazon(
                     if not _location_in_region(location):
                         continue
                     seen.add(url)
+                    if not _title_ok(job.get("title") or "", roles):
+                        continue
                     found.append(normalize_job({
                         "title": job.get("title") or "",
                         "company": "Amazon",
@@ -176,7 +196,11 @@ async def scrape_microsoft(
             browser, ctx = await create_browser_context(pw, headless=headless)
             page = await ctx.new_page()
             for place, _country in _search_places():
+                if should_stop():
+                    break
                 for role in roles:
+                    if should_stop() or len(found) >= max_jobs:
+                        break
                     url = (
                         "https://jobs.careers.microsoft.com/global/en/search"
                         f"?q={requests.utils.quote(role)}&lc={requests.utils.quote(place)}"
@@ -197,6 +221,8 @@ async def scrape_microsoft(
                         # The lc= parameter does not reliably filter, so the location
                         # is checked here rather than trusted from the query.
                         if not _location_in_region(card.get("location", "")):
+                            continue
+                        if not _title_ok(card["title"], roles):
                             continue
                         found.append(normalize_job({
                             "title": card["title"],
@@ -256,7 +282,11 @@ async def scrape_google(
             browser, ctx = await create_browser_context(pw, headless=headless)
             page = await ctx.new_page()
             for place, _country in _search_places():
+                if should_stop():
+                    break
                 for role in roles:
+                    if should_stop() or len(found) >= max_jobs:
+                        break
                     url = (
                         "https://www.google.com/about/careers/applications/jobs/results/"
                         f"?q={requests.utils.quote(role)}&location={requests.utils.quote(place)}"
@@ -267,6 +297,8 @@ async def scrape_google(
                     cards = await page.evaluate(script)
                     for card in cards:
                         if not _location_in_region(card.get("location", "")):
+                            continue
+                        if not _title_ok(card["title"], roles):
                             continue
                         found.append(normalize_job({
                             "title": card["title"],

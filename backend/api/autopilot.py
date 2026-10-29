@@ -25,7 +25,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from backend.applier.routing import Route
-from backend.autopilot.select import Tier, select
+from backend.autopilot.select import Tier, cap_jobs_per_company, select
 from backend.config import settings
 from backend.db.models import Job, SessionLocal, get_db
 from backend.resume.tailor import tailored_pdf
@@ -93,6 +93,9 @@ def candidates(
         job for job in db.query(Job).filter(~Job.status.in_(CLOSED_STATUSES)).all()
         if job_in_region(job, region)
     ]
+    if region == "europe":
+        jobs.sort(key=lambda job: -(job.relevance_score or 0))
+        jobs = cap_jobs_per_company(jobs)
     preferred = (
         EUROPE_PREFERRED_LOCATIONS if region == "europe"
         else settings.preferred_locations_list

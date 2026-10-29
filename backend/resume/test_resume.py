@@ -420,7 +420,7 @@ def test_tailored_lookup() -> None:
 
 REORDER_TEX = r"""\documentclass{article}
 \begin{document}
-% tempoapply-headlines: Backend engineer | Platform / infrastructure engineer
+% Quill-headlines: Backend engineer | Platform / infrastructure engineer
 \section{Summary}
 \small
 Backend engineer with production ownership of fleet infrastructure.

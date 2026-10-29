@@ -615,13 +615,16 @@ def is_closed_posting(job_data: dict) -> Tuple[bool, str]:
 
 
 def matches_region(job_data: dict, region: str = "india") -> bool:
-    """Location (and, in Europe, a visa refusal) for rows already stored."""
+    """Location (and, in Europe, a visa refusal and a known sponsor) for stored rows."""
     ok, _ = is_location_allowed(job_data, region=region)
     if not ok:
         return False
     if region == "europe":
         refused, _ = visa_refused(job_data.get("jd_text") or "")
         if refused:
+            return False
+        from backend.autopilot.select import sponsors_europe_visa
+        if not sponsors_europe_visa(job_data.get("company") or ""):
             return False
     return True
 
@@ -633,6 +636,7 @@ def job_in_region(job, region: str = "india") -> bool:
             "title": job.title or "",
             "jd_text": job.jd_text or "",
             "platform": job.platform or "",
+            "company": job.company or "",
         },
         region,
     )
@@ -658,4 +662,8 @@ def passes_hard_filters(
         refused, why = visa_refused(jd)
         if refused:
             return False, why
+        from backend.autopilot.select import sponsors_europe_visa
+        company = job_data.get("company") or ""
+        if not sponsors_europe_visa(company):
+            return False, f"Not a known visa sponsor: '{company}'"
     return is_job_experience_valid(job_data, max_years=max_years, require_jd=require_jd)

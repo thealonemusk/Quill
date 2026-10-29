@@ -75,7 +75,7 @@ class Settings(BaseSettings):
 
     # App
     base_resume_path: str = "resumes/base_resume.tex"
-    database_url: str = "sqlite:///./tempoapply.db"
+    database_url: str = "sqlite:///./Quill.db"
     # Localhost only. 0.0.0.0 served the profile, the resume and every
     # write endpoint to anything on the same Wi-Fi, with no login.
     api_host: str = "127.0.0.1"

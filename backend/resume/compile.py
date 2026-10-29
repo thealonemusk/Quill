@@ -152,7 +152,7 @@ def compile_tex(
     out_pdf = Path(out_pdf)
     out_pdf.parent.mkdir(parents=True, exist_ok=True)
 
-    with tempfile.TemporaryDirectory(prefix="tempoapply-tex-") as tmp:
+    with tempfile.TemporaryDirectory(prefix="Quill-tex-") as tmp:
         work = Path(tmp)
         tex = work / "resume.tex"
         tex.write_text(source, encoding="utf-8")

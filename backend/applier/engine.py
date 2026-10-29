@@ -258,7 +258,7 @@ async def run_apply_pipeline(
                     if not await ensure_linkedin_session(page):
                         return {
                             **summary,
-                            "error": "LinkedIn not signed in. Use the TempoApply Chrome window, then retry.",
+                            "error": "LinkedIn not signed in. Use the Quill Chrome window, then retry.",
                         }
 
                 for i, job in enumerate(jobs):

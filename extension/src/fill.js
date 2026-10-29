@@ -275,16 +275,16 @@
   let reactSeq = 0;
   function viaBridge(el, msg) {
     const token = `ta${Date.now().toString(36)}${(reactSeq += 1)}`;
-    el.setAttribute("data-tempoapply-react", token);
-    el.removeAttribute("data-tempoapply-react-result");
+    el.setAttribute("data-Quill-react", token);
+    el.removeAttribute("data-Quill-react-result");
     try {
       document.dispatchEvent(
-        new CustomEvent("tempoapply:react", { detail: JSON.stringify({ token, ...msg }) })
+        new CustomEvent("Quill:react", { detail: JSON.stringify({ token, ...msg }) })
       );
-      return el.getAttribute("data-tempoapply-react-result") || "nobridge";
+      return el.getAttribute("data-Quill-react-result") || "nobridge";
     } finally {
-      el.removeAttribute("data-tempoapply-react");
-      el.removeAttribute("data-tempoapply-react-result");
+      el.removeAttribute("data-Quill-react");
+      el.removeAttribute("data-Quill-react-result");
     }
   }
 
@@ -1145,7 +1145,7 @@
       const onMove = (e) => {
         const target = document.elementFromPoint(e.clientX, e.clientY);
         // Never offer our own overlay or the panel as a section.
-        if (!target || target.closest("[data-ta-picker], #tempoapply-widget-host")) return;
+        if (!target || target.closest("[data-ta-picker], #Quill-widget-host")) return;
         const section = sectionAround(target);
         if (!section) return;
         current = section;
