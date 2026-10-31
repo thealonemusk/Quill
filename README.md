@@ -1,6 +1,6 @@
 # Quill — Job Search Engine
 
-Automated multi-platform job discovery for early-career software roles. The Jobs page switches the search between India and Europe (the UK, Ireland, Germany, and the Netherlands). Hard filters drop senior titles, roles asking for more than two years, and locations outside the region you picked.
+Automated multi-platform job discovery for early-career software roles. The Jobs page switches the search between India and Europe (the UK, Ireland, Germany, the Netherlands, and Sweden). Hard filters drop senior titles, roles asking for more than two years, and locations outside the region you picked.
 
 ## Quick start
 
@@ -32,7 +32,7 @@ UI: `http://localhost:3000`
 
 **India** (the default) scans LinkedIn, Naukri, and company career sites (Greenhouse, Lever, Ashby, Workday).
 
-**Europe** ignores that list. It searches LinkedIn, Amazon, Microsoft, and Google for the UK, Ireland, Germany, and the Netherlands, and hides a posting that says it will not sponsor a visa. Clearing the list, or removing jobs you have already opened, leaves the other region in the database.
+**Europe** ignores that list. It searches LinkedIn, Amazon, Microsoft, and Google for the UK, Ireland, Germany, the Netherlands, and Sweden, and hides a posting that says it will not sponsor a visa. Clearing the list, or removing jobs you have already opened, leaves the other region in the database.
 
 Indeed, InstaHyre, and Wellfound stay in the codebase and run only when a scan asks for them. The platform list is `backend/platforms.py`, exposed via `GET /api/settings`. `TARGET_REGION` in `config/env.template` is `india` or `europe`.
 

@@ -1,7 +1,7 @@
 """
 Filter utilities — text parsing and strict experience/title/location checks.
 Hard limits: <= 2 years experience, no frontend-only roles.
-Location follows the region: India, or the UK, Ireland, Germany, and the Netherlands.
+Location follows the region: India, or the UK, Ireland, Germany, the Netherlands, and Sweden.
 """
 
 import re
@@ -100,6 +100,7 @@ ABROAD_MARKERS = (
     "united kingdom", "england", "london", "manchester", "scotland",
     "canada", "toronto", "vancouver", "ontario", "montreal",
     "germany", "berlin", "munich", "netherlands", "amsterdam",
+    "sweden", "stockholm",
     "australia", "sydney", "melbourne", "singapore", "dubai", "uae",
     "ireland", "dublin", "poland", "warsaw", "remote - us", "remote, us",
     "remote (us)", "us remote",
@@ -326,9 +327,9 @@ def _jd_cued_places(jd: str) -> Tuple[bool, bool]:
     return india, abroad
 
 
-# Europe mode: the UK, Ireland, Germany, and the Netherlands. "ireland" is not
-# in the UK list; "northern ireland" is masked before the Ireland markers run,
-# so it counts as the UK only.
+# Europe mode: the UK, Ireland, Germany, the Netherlands, and Sweden.
+# "ireland" is not in the UK list; "northern ireland" is masked before the
+# Ireland markers run, so it counts as the UK only.
 _UK_MARKERS = (
     "united kingdom", "great britain", "northern ireland",
     "england", "scotland", "wales",
@@ -341,22 +342,30 @@ _NETHERLANDS_MARKERS = (
     "netherlands", "holland", "amsterdam", "rotterdam", "utrecht",
     "eindhoven", "the hague",
 )
-EUROPE_COUNTRIES = ("united kingdom", "ireland", "germany", "netherlands")
+# Boards write Gothenburg and Malmö with or without the Swedish spelling.
+_SWEDEN_MARKERS = (
+    "sweden", "sverige",
+    "stockholm", "gothenburg", "goteborg", "göteborg",
+    "malmo", "malmö",
+)
+EUROPE_COUNTRIES = ("united kingdom", "ireland", "germany", "netherlands", "sweden")
 _EUROPE_MARKER_SET = frozenset(
     _UK_MARKERS + _IRELAND_MARKERS + _GERMANY_MARKERS + _NETHERLANDS_MARKERS
+    + _SWEDEN_MARKERS
 )
 # A city, not the country name. "teams span the UK and India" is not a UK role.
 _EUROPE_CITIES = (
     "london", "manchester", "edinburgh", "birmingham", "bristol", "cambridge",
     "glasgow", "leeds", "dublin", "cork", "galway", "berlin", "munich",
     "hamburg", "frankfurt", "amsterdam", "rotterdam", "utrecht", "eindhoven",
-    "the hague",
+    "the hague", "stockholm", "gothenburg", "goteborg", "göteborg",
+    "malmo", "malmö",
 )
 # Places the Europe search does not want, and that ABROAD_MARKERS does not
 # already name. Paris would otherwise look like "no country" and fall through.
 _OTHER_COUNTRY_MARKERS = (
     "france", "paris", "spain", "madrid", "barcelona", "italy", "milan", "rome",
-    "poland", "warsaw", "sweden", "stockholm", "belgium", "brussels",
+    "poland", "warsaw", "belgium", "brussels",
     "austria", "vienna", "switzerland", "zurich", "portugal", "lisbon",
     "denmark", "copenhagen", "finland", "helsinki", "prague", "czechia",
     "luxembourg", "norway", "oslo", "hungary", "budapest", "greece", "athens",
@@ -366,6 +375,7 @@ _OTHER_COUNTRY_MARKERS = (
 # each city multiplies the request count.
 EUROPE_SEARCH_LOCATIONS = [
     "London", "Manchester", "Dublin", "Berlin", "Munich", "Amsterdam",
+    "Stockholm",
 ]
 # Autopilot scores a location by matching these. Anything the allow-list
 # accepts has to hit one of them, or Edinburgh is "out of scope".
@@ -377,6 +387,8 @@ EUROPE_PREFERRED_LOCATIONS = [
     "Germany", "Berlin", "Munich", "Hamburg", "Frankfurt",
     "Netherlands", "Holland", "Amsterdam", "Rotterdam", "Utrecht", "Eindhoven",
     "The Hague",
+    "Sweden", "Sverige", "Stockholm", "Gothenburg", "Goteborg", "Göteborg",
+    "Malmo", "Malmö",
 ]
 
 # A sentence that refuses a visa. Neutral mentions ("sponsorship") are not
@@ -432,7 +444,7 @@ _VISA_OFFER = (
 
 
 def europe_countries_in(blob: str) -> set:
-    """Which of the four target countries `blob` names."""
+    """Which of the target countries `blob` names."""
     low = (blob or "").lower()
     found = set()
     if any(_contains_marker(low, m) for m in _UK_MARKERS):
@@ -445,17 +457,19 @@ def europe_countries_in(blob: str) -> set:
         found.add("germany")
     if any(_contains_marker(low, m) for m in _NETHERLANDS_MARKERS):
         found.add("netherlands")
+    if any(_contains_marker(low, m) for m in _SWEDEN_MARKERS):
+        found.add("sweden")
     return found
 
 
 def europe_location_ok(location: str) -> bool:
-    """The location names one of the four countries and no other."""
+    """The location names a target country and no other."""
     blob = location or ""
     return bool(europe_countries_in(blob)) and not _outside_europe(blob)
 
 
 def _outside_europe(blob: str) -> bool:
-    """A country other than the four. Target markers themselves do not count."""
+    """A country other than the target set. Target markers themselves do not count."""
     low = (blob or "").lower()
     if _india_in(low):
         return True
@@ -514,7 +528,7 @@ def visa_refused(jd_text: str) -> Tuple[bool, str]:
 
 
 def is_europe_location_allowed(job_data: dict) -> Tuple[bool, str]:
-    """UK, Ireland, Germany, or the Netherlands, and nowhere else."""
+    """UK, Ireland, Germany, the Netherlands, or Sweden, and nowhere else."""
     location = (job_data.get("location") or "").strip()
     title = job_data.get("title") or ""
     jd = (job_data.get("jd_text") or "")[:1200].lower()
@@ -524,9 +538,9 @@ def is_europe_location_allowed(job_data: dict) -> Tuple[bool, str]:
     here = europe_countries_in(loc)
     elsewhere = _outside_europe(loc)
     if here and not elsewhere:
-        return True, "UK, Ireland, Germany, or Netherlands"
+        return True, "UK, Ireland, Germany, Netherlands, or Sweden"
     if elsewhere:
-        return False, f"Outside UK, Ireland, Germany, and the Netherlands: '{shown}'"
+        return False, f"Outside UK, Ireland, Germany, the Netherlands, and Sweden: '{shown}'"
 
     cue_here, cue_elsewhere = _jd_cued_europe(jd)
     if cue_here and not cue_elsewhere:
@@ -540,8 +554,8 @@ def is_europe_location_allowed(job_data: dict) -> Tuple[bool, str]:
     if not loc:
         return False, "Missing location"
     if "remote" in loc or "work from home" in loc or loc in {"wfh", "anywhere", "multiple locations"}:
-        return False, f"Remote outside UK, Ireland, Germany, and the Netherlands: '{location}'"
-    return False, f"Outside UK, Ireland, Germany, and the Netherlands: '{location}'"
+        return False, f"Remote outside UK, Ireland, Germany, the Netherlands, and Sweden: '{location}'"
+    return False, f"Outside UK, Ireland, Germany, the Netherlands, and Sweden: '{location}'"
 
 
 def is_location_allowed(job_data: dict, region: str = "india") -> Tuple[bool, str]:

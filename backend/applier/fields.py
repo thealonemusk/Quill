@@ -415,7 +415,7 @@ def work_auth_answer(profile: ApplicantProfile, label: str) -> Optional[str]:
     if best is not None:
         return best
 
-    # Europe mode is his instruction that he needs a visa in these four
+    # Europe mode is his instruction that he needs a visa in these
     # countries. A US question is not one of them, and stays blank.
     if APPLY_REGION.get() == "europe":
         from backend.scrapers.filter_utils import EUROPE_COUNTRIES

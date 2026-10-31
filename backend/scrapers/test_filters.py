@@ -68,7 +68,7 @@ def _exp_ok(jd: str, max_years=2) -> bool:
 
 
 def test_europe() -> None:
-    section("1b. Europe: UK, Ireland, Germany, Netherlands; a visa refusal drops the post")
+    section("1b. Europe: UK, Ireland, Germany, Netherlands, Sweden; a visa refusal drops the post")
     from backend.scrapers.filter_utils import europe_countries_in, passes_hard_filters, visa_refused
 
     def eu(location: str, jd: str = "", title: str = "Software Engineer") -> bool:
@@ -93,6 +93,7 @@ def test_europe() -> None:
     for city in (
         "London, United Kingdom", "Manchester", "Remote, UK",
         "Dublin, Ireland", "Berlin, Germany", "Amsterdam, Netherlands",
+        "Stockholm, Sweden", "Gothenburg", "Malmö", "Goteborg",
         "Edinburgh, Scotland", "Belfast, Northern Ireland",
     ):
         check(f"Europe keeps {city!r}", eu(city), True)
@@ -101,6 +102,9 @@ def test_europe() -> None:
     check("Europe rejects Seattle", eu("Seattle, WA"), False)
     check("Europe rejects bare Remote", eu("Remote"), False)
     check("Europe rejects London; Seattle", eu("London; Seattle, WA"), False)
+    check("Europe rejects Stockholm and Paris", eu("Stockholm; Paris, France"), False)
+    check("Sweden is Sweden only",
+          europe_countries_in("Stockholm, Sweden"), {"sweden"})
     check("Europe rejects Indianapolis", eu("Indianapolis, IN"), False)
     check("Northern Ireland is the UK only",
           europe_countries_in("Northern Ireland"), {"united kingdom"})
@@ -128,6 +132,7 @@ def test_location() -> None:
           _loc("Atlanta, Georgia", "Join NCR Voyix and build the future of commerce."), False)
     check("title 'NCR Voyix' is not Delhi NCR", _loc("", title="Software Engineer - NCR Voyix"), False)
     check("Dublin, Dublin rejected (CLAUDE.md)", _loc("Dublin, Dublin"), False)
+    check("Stockholm is not India", _loc("Stockholm, Sweden"), False)
     check("Indianapolis is not India", _loc("Indianapolis, IN"), False)
     check("Indianapolis without a state is not India", _loc("Indianapolis"), False)
 
@@ -589,9 +594,13 @@ def test_europe_sponsors() -> None:
     check("eight Amazon jobs at most", sum(1 for r in capped if r["company"] == "Amazon"), 8)
     check("Stripe survives the Amazon cap", any(r["company"] == "Stripe" for r in capped), True)
     queries = europe_sponsor_queries("Software Engineer")
-    check("sponsor search stays bounded", len(queries) <= 72, True)
+    check("sponsor search covers the list", len(queries) > 72, True)
+    check("IBM is searched, not only the first page of names", any("ibm" in q[0] for q in queries), True)
     check("Amazon is not a LinkedIn query", all("amazon" not in q[0] for q in queries), True)
     check("Booking is searched", any("booking" in q[0] for q in queries), True)
+    check("Sweden is searched", any(q[1] == "Sweden" for q in queries), True)
+    both = europe_sponsor_queries(["Software Engineer", "Backend Engineer"])
+    check("a second role doubles the search", len(both), len(queries) * 2)
 
 
 def test_europe_scan_bounds() -> None:

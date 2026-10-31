@@ -51,6 +51,7 @@ def _search_places() -> List[tuple]:
             ("Ireland", "IRL"),
             ("Germany", "DEU"),
             ("Netherlands", "NLD"),
+            ("Sweden", "SWE"),
         ]
     return [("India", "IND")]
 

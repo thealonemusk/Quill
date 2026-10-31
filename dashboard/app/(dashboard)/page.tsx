@@ -6,6 +6,7 @@ import clsx from 'clsx';
 import { api } from '@/lib/api';
 import type { Job, SettingsData } from '@/lib/types';
 import { ScanBar } from '@/components/ScanBar';
+import { applyRegionTheme } from '@/lib/region-theme';
 import { JobCard, JobRow } from '@/components/JobRow';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -50,7 +51,10 @@ export default function JobsPage() {
       .catch(() => {});
     api.getApplyStatus().then((s) => setApplying(!!s.running)).catch(() => {});
     api.getSettings().then((s) => {
-      if (s.target_region === 'europe' || s.target_region === 'india') setRegion(s.target_region);
+      if (s.target_region === 'europe' || s.target_region === 'india') {
+        setRegion(s.target_region);
+        applyRegionTheme(s.target_region);
+      }
     }).catch(() => {});
   }, [loadJobs]);
 
@@ -92,6 +96,7 @@ export default function JobsPage() {
     try {
       await api.saveSettings({ target_region: next });
       setRegion(next);
+      applyRegionTheme(next);
       await loadJobs(true);
     } catch (err) {
       setScanError(err instanceof Error ? err.message : 'Could not switch region');
@@ -323,7 +328,7 @@ export default function JobsPage() {
             </div>
             {region === 'europe' && (
               <p className="mt-2 text-sm text-[var(--text-secondary)]">
-                UK, Ireland, Germany, Netherlands. Known visa sponsors only, eight jobs per company.
+                UK, Ireland, Germany, Netherlands, Sweden. Known visa sponsors only, eight jobs per company.
               </p>
             )}
             <div className="mt-3 flex flex-wrap gap-1.5">

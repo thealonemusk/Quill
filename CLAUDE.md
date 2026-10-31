@@ -122,7 +122,7 @@ scripts/audit.py               repo health; run it before declaring anything don
   `action="skip"`; the extension skips at `fill.js:257`. Intel's form has a
   `beecatcher` field that silently discards the application if filled.
 - **`TARGET_REGION` is `india` or `europe`, and the other region's rows stay
-  stored.** Europe means the UK, Ireland, Germany, and the Netherlands. The
+  stored.** Europe means the UK, Ireland, Germany, the Netherlands, and Sweden. The
   Jobs page toggle writes the setting. A save that omits `target_region`
   keeps the current value; anything else is read back as `india`
   (`settings.active_region`). The jobs list, autopilot candidates, apply-all,
@@ -142,7 +142,7 @@ scripts/audit.py               repo health; run it before declaring anything don
   `APPLY_REGION` defaults to `india` and is set with `JOB_LOCATION` by the
   apply engine and `/api/autofill/resolve`. In Europe mode a London or Berlin
   sponsorship question is Yes and authorisation is No: he needs a visa in
-  those four countries. A US question stays blank. In India mode London stays
+  those countries. A US question stays blank. In India mode London stays
   blank. "London" is not in `COUNTRY_NAMES`; `europe_countries_in` maps the
   city. A caller that sets the job location and forgets the region answers
   the UK under India rules.
@@ -328,7 +328,7 @@ per job by the engine and per request by `/api/autofill/resolve`. A known
 India-located job answers from the profile; a job abroad answers
 authorisation "No" and leaves sponsorship blank; an unknown page leaves both
 blank. Blank beats false. Europe mode (2026-10-29) is the exception for the
-UK, Ireland, Germany, and the Netherlands — the region decision above.
+UK, Ireland, Germany, the Netherlands, and Sweden — the region decision above.
 
 Tailoring runs on OpenRouter (`LLM_PROVIDER=openrouter`, model
 `openrouter/free`, which routes to whichever free model has capacity). Its

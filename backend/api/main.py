@@ -346,7 +346,7 @@ def clear_discovered_jobs(
     being offered again, but the `jobs` row and its Application detail go.
 
     Only the region selected on the dashboard. Clearing India leaves the
-    UK / Ireland / Germany / Netherlands rows, and the reverse.
+    UK / Ireland / Germany / Netherlands / Sweden rows, and the reverse.
     """
     statuses = list(CLEARABLE_STATUSES)
     if include_applied:

@@ -61,10 +61,12 @@ LINKEDIN_PAGES = 3
 # One page per city. Three pages across six cities is what left a Europe
 # scan fetching descriptions long after the list still looked empty.
 EUROPE_LINKEDIN_PAGES = 1
-EUROPE_LISTING_CAP = 40
-# First sponsors in the list, one page in each of the four countries.
-EUROPE_SPONSOR_SEARCHES = 72
-EUROPE_PER_COMPANY = 4
+# The previous cap stopped after the first 18 employers, which is why the
+# Europe list sat at ~26. This is how many title-clean listings to keep
+# before fetching descriptions.
+EUROPE_LISTING_CAP = 120
+EUROPE_ROLE_QUERIES = 2
+EUROPE_PER_COMPANY = 8
 PAGE_SIZE = 10
 
 # Two JD fetches per listing, and the search pages are still going. Six
@@ -205,20 +207,39 @@ def linkedin_page_count(region: str) -> int:
     return EUROPE_LINKEDIN_PAGES if region == "europe" else LINKEDIN_PAGES
 
 
-def europe_sponsor_queries(role: str) -> List[tuple]:
-    """Role plus employer, in the four countries. Amazon is searched on its own API."""
+def europe_sponsor_queries(roles) -> List[tuple]:
+    """Each sponsor, in each Europe country, for the first target roles.
+
+    Amazon is searched on its own API. "j.p. morgan" is the same employer
+    as "jpmorgan".
+    """
     from backend.autopilot.select import EUROPE_VISA_SPONSORS
 
-    places = ("United Kingdom", "Ireland", "Germany", "Netherlands")
-    role = (role or "Software Engineer").strip()
-    queries = []
-    for company in EUROPE_VISA_SPONSORS:
-        if company == "amazon":
+    if isinstance(roles, str):
+        roles = [roles]
+    chosen: List[str] = []
+    seen_roles: Set[str] = set()
+    for role in roles or []:
+        text = (role or "").strip()
+        key = text.lower()
+        if not text or key in seen_roles:
             continue
-        for place in places:
-            queries.append((f"{role} {company}", place))
-            if len(queries) >= EUROPE_SPONSOR_SEARCHES:
-                return queries
+        seen_roles.add(key)
+        chosen.append(text)
+        if len(chosen) >= EUROPE_ROLE_QUERIES:
+            break
+    if not chosen:
+        chosen = ["Software Engineer"]
+
+    places = ("United Kingdom", "Ireland", "Germany", "Netherlands", "Sweden")
+    skip = {"amazon", "j.p. morgan"}
+    queries = []
+    for role in chosen:
+        for company in EUROPE_VISA_SPONSORS:
+            if company in skip:
+                continue
+            for place in places:
+                queries.append((f"{role} {company}", place))
     return queries
 
 
@@ -307,7 +328,7 @@ def _collect_listings(
     return listings
 
 
-def _collect_sponsor_listings(role: str, max_jobs: int) -> List[dict]:
+def _collect_sponsor_listings(roles, max_jobs: int) -> List[dict]:
     """Search known sponsors. A bare role search was mostly recruiters."""
     from backend.autopilot.select import sponsors_europe_visa
 
@@ -315,7 +336,7 @@ def _collect_sponsor_listings(role: str, max_jobs: int) -> List[dict]:
     seen_urls: Set[str] = set()
     per_company: dict = {}
     failed_pages = 0
-    for keywords, location in europe_sponsor_queries(role):
+    for keywords, location in europe_sponsor_queries(roles):
         if should_stop() or len(listings) >= max_jobs:
             break
         try:
@@ -424,14 +445,13 @@ async def scrape_linkedin_jobs(
         # A role-only search returned recruiters. Ask for known sponsors,
         # and keep Amazon on its own API where it can be capped.
         roles = resolve_roles(settings.target_roles_list)
-        role = roles[0] if roles else "Software Engineer"
         max_jobs = min(max_jobs, EUROPE_LISTING_CAP)
-        queries = europe_sponsor_queries(role)
+        queries = europe_sponsor_queries(roles)
         logger.info(
-            f"LinkedIn: {len(queries)} sponsor searches for {role!r} "
+            f"LinkedIn: {len(queries)} sponsor searches "
             f"(cap {max_jobs} listings)"
         )
-        listings = await asyncio.to_thread(_collect_sponsor_listings, role, max_jobs)
+        listings = await asyncio.to_thread(_collect_sponsor_listings, roles, max_jobs)
     else:
         roles = resolve_discovery_roles(roles or settings.target_roles_list)
         locations = _merge_locations(locations or settings.preferred_locations_list)

@@ -70,6 +70,23 @@
   --chrome: #0c100c;
 }
 
+/* Europe keeps the same tokens. Only the green mark becomes teal, and the
+   page wash follows so the chrome is not still green behind a teal button. */
+html[data-region="europe"] {
+  --signal: #2ec4b6;
+  --bg: #f2f7f6;
+  --surface-2: #e7f3f1;
+  --surface-3: #d9ece8;
+}
+
+html.dark[data-region="europe"] {
+  --bg: #0f1615;
+  --surface: #15201e;
+  --surface-2: #1b2826;
+  --surface-3: #263634;
+  --chrome: #0c1211;
+}
+
 * {
   box-sizing: border-box;
 }

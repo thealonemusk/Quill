@@ -49,7 +49,7 @@ class Settings(BaseSettings):
     target_roles: str = "Software Engineer,Backend Engineer"
     experience_years: int = 2
     preferred_locations: str = "Bengaluru,Remote"
-    # india | europe. Europe is UK, Ireland, Germany, and the Netherlands.
+    # india | europe. Europe is UK, Ireland, Germany, the Netherlands, and Sweden.
     target_region: str = "india"
     min_relevance_score: int = 55
     excluded_companies: str = ""

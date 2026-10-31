@@ -317,6 +317,10 @@ def test_job_location(profile: ApplicantProfile) -> None:
     check("Europe + London: sponsorship Yes", under_region("London", no_country, "europe"), "Yes")
     check("Europe + London: not authorised", under_region("London", in_country, "europe"), "No")
     check("Europe + Berlin: sponsorship Yes", under_region("Berlin, Germany", no_country, "europe"), "Yes")
+    check("Europe + Stockholm: sponsorship Yes", under_region("Stockholm, Sweden", no_country, "europe"), "Yes")
+    check("Europe + Stockholm: not authorised", under_region("Stockholm", in_country, "europe"), "No")
+    check("Europe + named Sweden sponsorship Yes",
+          under_region("", "Will you require visa sponsorship to work in Sweden?", "europe"), "Yes")
     check("Europe + named UK sponsorship Yes", under_region("", uk_sponsor, "europe"), "Yes")
     check("Europe + UK authorisation No",
           under_region("London", "Do you have the right to work in the United Kingdom?", "europe"), "No")
