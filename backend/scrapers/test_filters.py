@@ -541,6 +541,8 @@ def test_dedup() -> None:
         ]
         added = pipeline.upsert_jobs(batch, db)
         check("distinct reqs kept, mirror + repeat dropped", added, 4)
+        check("two Amazon reqs in one city both stay",
+              db.query(Job).filter(Job.location == "Bengaluru").count(), 2)
 
         # Against the DB: a new req with the same title is not a duplicate,
         # a mirror from another host is.
@@ -559,6 +561,31 @@ def test_dedup() -> None:
         wild = [{"title": "SE%Platform", "company": "Acme", "location": "Pune",
                  "url": "https://other.example/2", "platform": "p"}]
         check("'%' in a title is not a wildcard", pipeline.upsert_jobs(wild, db), 1)
+
+        reposts = [
+            {"title": "Application Developer-Java & Web Technologies", "company": "IBM",
+             "location": "Bengaluru, Karnataka, India",
+             "url": "https://in.linkedin.com/jobs/view/application-developer-java-web-technologies-at-ibm-4488217274",
+             "platform": "linkedin"},
+            {"title": "Application Developer-Java & Web Technologies", "company": "IBM",
+             "location": "Bengaluru, Karnataka, India",
+             "url": "https://in.linkedin.com/jobs/view/application-developer-java-web-technologies-at-ibm-4487854366",
+             "platform": "linkedin"},
+        ]
+        check("LinkedIn reposts of one opening collapse", pipeline.upsert_jobs(reposts, db), 1)
+        shown = pipeline.collapse_linkedin_reposts([
+            type("J", (), row)()
+            for row in reposts + [
+                {"title": sde, "company": "Amazon", "location": "Bengaluru",
+                 "url": "https://www.amazon.jobs/en/jobs/1001"},
+                {"title": sde, "company": "Amazon", "location": "Bengaluru",
+                 "url": "https://www.amazon.jobs/en/jobs/1003"},
+            ]
+        ])
+        check("the list keeps one LinkedIn repost",
+              sum(1 for job in shown if job.company == "IBM"), 1)
+        check("the list keeps both Amazon reqs",
+              sum(1 for job in shown if job.company == "Amazon"), 2)
         db.close()
     finally:
         pipeline.passes_hard_filters, pipeline.score_job = saved

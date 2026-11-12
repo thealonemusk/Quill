@@ -47,17 +47,41 @@ def _host(url: str) -> str:
     return host[4:] if host.startswith("www.") else host
 
 
-def _is_cross_post(seen_hosts, host: str) -> bool:
-    """Is this the same posting already taken from a *different* site?
+def _linkedin_host(host: str) -> bool:
+    host = (host or "").lower()
+    return host == "linkedin.com" or host.endswith(".linkedin.com")
 
-    Dedup is by URL first. Title + company used to be a second key, and it
-    dropped distinct requisitions: Amazon lists dozens of "Software
-    Development Engineer" roles, one per team and city, and all but the first
-    vanished. Now location is part of the key, and two URLs on the same host
-    are two requisitions (that host's own job ids differ) — only a match from
-    another host, e.g. LinkedIn mirroring a careers page, is a duplicate.
+
+def _is_duplicate(seen_hosts, host: str) -> bool:
+    """Is this the same posting already stored under this title, company and city?
+
+    A different site is a mirror. LinkedIn also mints a new job id when it
+    reposts one requisition, so a second LinkedIn URL with the same title,
+    company and city is the same opening. A careers site's own ids are not:
+    Amazon lists many "Software Development Engineer" roles in one city.
     """
-    return bool(seen_hosts) and any(h != host for h in seen_hosts)
+    if not seen_hosts:
+        return False
+    if _linkedin_host(host) and any(_linkedin_host(h) for h in seen_hosts):
+        return True
+    return any(h != host for h in seen_hosts)
+
+
+def collapse_linkedin_reposts(jobs):
+    """One row per LinkedIn title, company and city. Other sites are untouched."""
+    seen = set()
+    kept = []
+    for job in jobs:
+        if not _linkedin_host(_host(getattr(job, "url", "") or "")):
+            kept.append(job)
+            continue
+        key = _dup_key(job.title or "", job.company or "", job.location or "")
+        if key and key in seen:
+            continue
+        if key:
+            seen.add(key)
+        kept.append(job)
+    return kept
 
 
 def _known_jobs(db: Session):
@@ -111,7 +135,7 @@ def upsert_jobs(jobs: list, db: Session) -> int:
         dkey = _dup_key(title, company, job_data.get("location", ""))
         host = _host(url)
 
-        if ukey in batch_urls or _is_cross_post(batch_dups.get(dkey), host):
+        if ukey in batch_urls or _is_duplicate(batch_dups.get(dkey), host):
             continue
 
         # The ledger remembers decisions the user already made, even for jobs
@@ -173,7 +197,7 @@ def upsert_jobs(jobs: list, db: Session) -> int:
 
         # Equality on the normalized key, not ilike: ilike read "_" and "%"
         # in a title as wildcards. Hosts were loaded with the same key.
-        if dkey and _is_cross_post(known_dups.get(dkey), host):
+        if dkey and _is_duplicate(known_dups.get(dkey), host):
             continue
 
         missing_skills = json.dumps(job_data.get("missing_skills", []))

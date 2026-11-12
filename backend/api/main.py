@@ -225,7 +225,10 @@ def get_jobs(
             dirty = True
     if dirty:
         db.commit()
+    from backend.pipeline import collapse_linkedin_reposts
+
     visible = [job for job in jobs if job_in_region(job, settings.active_region)]
+    visible = collapse_linkedin_reposts(visible)
     if settings.active_region == "europe":
         # Amazon alone was most of the Europe list. Eight per employer
         # leaves room for the other sponsors.
