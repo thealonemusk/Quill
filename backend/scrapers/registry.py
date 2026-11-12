@@ -11,7 +11,6 @@ _FALLBACK_ROLES = [
     "AI Engineer",
     "Software Developer",
     "Platform Engineer",
-    "DevOps Engineer",
     "SDE",
     "Machine Learning Engineer",
 ]

@@ -309,6 +309,26 @@ def _contains_marker(blob: str, marker: str) -> bool:
     return bool(re.search(rf'(?<![a-z0-9]){re.escape(marker)}(?![a-z0-9])', blob))
 
 
+def india_excluded_role(title: str) -> str:
+    """A title India should not keep. Empty means it stays.
+
+    'support' alone is not enough: 'Software Engineer, Customer Support
+    Platform' is a software role. '.net' is a substring because 'asp.net'
+    has a letter before the dot, so a word boundary would miss it. 'sre'
+    is a whole word so it does not hit 'software'.
+    """
+    t = (title or "").lower()
+    if _contains_marker(t, "site reliability") or _contains_marker(t, "sre"):
+        return "Site Reliability Engineer"
+    if _contains_marker(t, "devops"):
+        return "DevOps Engineer"
+    if _contains_marker(t, "support engineer"):
+        return "Support Engineer"
+    if _contains_marker(t, "dotnet") or ".net" in t or _contains_marker(t, "dot net"):
+        return "Dotnet Developer"
+    return ""
+
+
 def _india_in(blob: str, markers=INDIA_MARKERS) -> bool:
     return any(_contains_marker(blob, m) for m in markers) or bool(NCR_RE.search(blob))
 
@@ -628,8 +648,24 @@ def is_closed_posting(job_data: dict) -> Tuple[bool, str]:
     return False, ""
 
 
+def india_company_block(company: str) -> str:
+    """India keeps a company only when it is on the tier lists. Empty if it stays."""
+    from backend.autopilot.select import Tier, company_tier
+
+    tier = company_tier(company or "")
+    if tier >= Tier.KNOWN:
+        return ""
+    if tier is Tier.EXCLUDED:
+        return f"Excluded company: '{company}'"
+    return f"Unknown company: '{company}'"
+
+
 def matches_region(job_data: dict, region: str = "india") -> bool:
     """Location (and, in Europe, a visa refusal and a known sponsor) for stored rows."""
+    if region != "europe" and india_excluded_role(job_data.get("title") or ""):
+        return False
+    if region != "europe" and india_company_block(job_data.get("company") or ""):
+        return False
     ok, _ = is_location_allowed(job_data, region=region)
     if not ok:
         return False
@@ -667,6 +703,13 @@ def passes_hard_filters(
     closed, why = is_closed_posting(job_data)
     if closed:
         return False, why
+    if region != "europe":
+        excluded = india_excluded_role(title)
+        if excluded:
+            return False, f"{excluded}: '{title}'"
+        blocked = india_company_block(job_data.get("company") or "")
+        if blocked:
+            return False, blocked
     if is_pure_frontend_role(title, jd):
         return False, f"Frontend role: '{title}'"
     ok, reason = is_location_allowed(job_data, region=region)

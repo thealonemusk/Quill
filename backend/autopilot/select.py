@@ -62,6 +62,16 @@ STRONG = {
     "mastercard", "paypal", "walmart", "target", "expedia", "booking",
     "thoughtworks", "tower research", "d. e. shaw", "de shaw", "optiver",
     "jane street", "millennium", "graviton", "quadeye", "rubrik", "pure storage",
+    # Product companies and bank tech with a real India engineering office.
+    # A generic LinkedIn query buries these under staffing shops.
+    "intuit", "servicenow", "workday", "hubspot", "shopify", "doordash",
+    "sprinklr", "autodesk", "motorola", "samsung", "amd", "broadcom", "arm",
+    "netapp", "fortinet", "crowdstrike", "splunk", "dynatrace", "cadence",
+    "synopsys", "applied materials", "bosch", "honeywell", "siemens",
+    "american express", "amex", "barclays", "hsbc", "standard chartered",
+    "wells fargo", "bank of america", "capital one", "blackrock", "bloomberg",
+    "experian", "philips", "delhivery", "dream11", "dream sports", "makemytrip",
+    "pine labs", "urban company", "zepto", "juspay", "chargebee", "cohesity",
 }
 
 KNOWN = {
@@ -71,6 +81,11 @@ KNOWN = {
     "cockroach labs", "scale ai", "crunchyroll", "agoda", "adyen", "quince",
     "tripadvisor", "lyft", "sofi", "ripple", "khan academy", "deutsche bank",
     "bnp paribas", "nielseniq", "wex", "gojek", "shadowfax", "capillary",
+    "launchdarkly", "grafana", "smartsheet", "commvault", "monzo", "toast",
+    "nykaa", "policybazaar", "policy bazaar", "bharatpe", "acko", "gupshup",
+    "sharechat", "clevertap", "hasura", "miro", "pagerduty", "redis", "neo4j",
+    "schneider electric", "western digital", "seagate", "marvell",
+    "analog devices", "oyo", "sentinelone", "grab",
 }
 
 # Names that mark an employer as an intermediary rather than the employer.
@@ -101,6 +116,7 @@ AMBIGUOUS_NAMES = {
     "square", "block", "notion", "elastic", "discord", "plaid", "target",
     "booking", "visa", "millennium", "turing", "chime", "harness", "ripple",
     "affirm", "sigmoid", "amplitude", "cred",
+    "arm", "toast", "miro", "grab",
 }
 
 _SUFFIX_RE = re.compile(
@@ -153,6 +169,19 @@ EUROPE_VISA_SPONSORS = (
     "twilio", "reddit", "coinbase", "openai", "anthropic", "linkedin",
 )
 EUROPE_JOBS_PER_COMPANY = 8
+
+# What the India LinkedIn search asks for by name. One query each, so this
+# list is the request budget. Every name has to sit on a tier above, or the
+# company filter throws the hit away.
+INDIA_COMPANY_SEARCH = (
+    "Google", "Microsoft", "Amazon", "Apple", "NVIDIA", "Meta",
+    "Adobe", "Salesforce", "Atlassian", "Uber", "Intuit", "ServiceNow",
+    "Oracle", "SAP", "Cisco", "Intel", "Qualcomm", "Databricks",
+    "Flipkart", "Swiggy", "Zomato", "Razorpay", "PhonePe", "Walmart",
+    "Goldman Sachs", "JPMorgan", "Morgan Stanley", "Freshworks", "Zoho",
+    "Postman", "CRED", "Meesho", "Groww", "Dream11", "MakeMyTrip",
+    "Visa", "PayPal", "Deutsche Bank", "Barclays", "Samsung",
+)
 
 _FAANG, _ELITE, _STRONG, _KNOWN = (_prep(s) for s in (FAANG, ELITE, STRONG, KNOWN))
 _EUROPE_SPONSORS = _prep(EUROPE_VISA_SPONSORS)
