@@ -648,23 +648,62 @@ def is_closed_posting(job_data: dict) -> Tuple[bool, str]:
     return False, ""
 
 
-def india_company_block(company: str) -> str:
-    """India keeps a company only when it is on the tier lists. Empty if it stays."""
+# An unknown employer is kept only for a software title or an AI engineer
+# title. "Data Engineer" and "Java Developer" are not either, and neither is
+# a recruiter whose name splits into "talent …".
+_UNKNOWN_ROLE_PHRASES = (
+    "software engineer", "software development engineer",
+    "backend engineer", "backend developer", "backend development",
+    "sde",
+)
+# "ai" and "ml" are whole words, so "email" and "html" do not qualify.
+_UNKNOWN_AI_WORDS = ("ai", "ml", "artificial intelligence", "machine learning")
+
+
+def _unknown_role_ok(title: str) -> bool:
+    t = (title or "").lower()
+    if any(_contains_marker(t, phrase) for phrase in _UNKNOWN_ROLE_PHRASES):
+        return True
+    if not _contains_marker(t, "engineer"):
+        return False
+    return any(_contains_marker(t, word) for word in _UNKNOWN_AI_WORDS)
+
+
+def _unknown_shop(company: str) -> bool:
+    # Split TalentRabbit before the word check, so Talentica is left alone.
+    name = re.sub(r"([a-z])([A-Z])", r"\1 \2", company or "").lower()
+    return any(_contains_marker(name, marker) for marker in ("talent", "events", "client of"))
+
+
+def india_company_block(company: str, title: str = "") -> str:
+    """Why an India row should be dropped for its employer. Empty if it stays.
+
+    A tiered company stays whatever the title is. A staffing firm never does.
+    An unknown company stays only for a software or AI engineer title, and a missing title
+    does not qualify — the named-company search calls this with the company
+    alone, so a recruiter card in those results stays out.
+    """
     from backend.autopilot.select import Tier, company_tier
 
-    tier = company_tier(company or "")
+    if not (company or "").strip():
+        return "Unknown company: ''"
+    tier = company_tier(company)
     if tier >= Tier.KNOWN:
         return ""
     if tier is Tier.EXCLUDED:
         return f"Excluded company: '{company}'"
-    return f"Unknown company: '{company}'"
+    if _unknown_shop(company) or not _unknown_role_ok(title):
+        return f"Unknown company: '{company}'"
+    return ""
 
 
 def matches_region(job_data: dict, region: str = "india") -> bool:
     """Location (and, in Europe, a visa refusal and a known sponsor) for stored rows."""
     if region != "europe" and india_excluded_role(job_data.get("title") or ""):
         return False
-    if region != "europe" and india_company_block(job_data.get("company") or ""):
+    if region != "europe" and india_company_block(
+        job_data.get("company") or "", job_data.get("title") or "",
+    ):
         return False
     ok, _ = is_location_allowed(job_data, region=region)
     if not ok:
@@ -707,7 +746,7 @@ def passes_hard_filters(
         excluded = india_excluded_role(title)
         if excluded:
             return False, f"{excluded}: '{title}'"
-        blocked = india_company_block(job_data.get("company") or "")
+        blocked = india_company_block(job_data.get("company") or "", title)
         if blocked:
             return False, blocked
     if is_pure_frontend_role(title, jd):

@@ -72,6 +72,7 @@ STRONG = {
     "wells fargo", "bank of america", "capital one", "blackrock", "bloomberg",
     "experian", "philips", "delhivery", "dream11", "dream sports", "makemytrip",
     "pine labs", "urban company", "zepto", "juspay", "chargebee", "cohesity",
+    "natwest", "transunion",
 }
 
 KNOWN = {
@@ -86,6 +87,7 @@ KNOWN = {
     "sharechat", "clevertap", "hasura", "miro", "pagerduty", "redis", "neo4j",
     "schneider electric", "western digital", "seagate", "marvell",
     "analog devices", "oyo", "sentinelone", "grab",
+    "sauce labs", "n-able", "media.net", "motive",
 }
 
 # Names that mark an employer as an intermediary rather than the employer.
@@ -101,13 +103,17 @@ EXCLUDED_MARKERS = (
     "ntt data", "birlasoft", "coforge", "hexaware", "persistent systems",
     "cgi", "dxc", "atos", "virtusa", "syntel", "iGate", "quess", "randstad",
     "adecco", "teamlease", "huntingcube", "crescendo", "antal", "michael page",
+    "exl", "ust", "capco", "wsp",
 )
 # Legal-entity boilerplate that body shops happen to use, and so do the Indian
 # subsidiaries of the companies we want: "Goldman Sachs Services Pvt Ltd",
 # "Swiggy - Bundl Technologies Pvt Ltd", "Amazon Hiring". These exclude only a
-# name that matched no tier.
+# name that matched no tier. "private limited" is the same boilerplate as
+# "pvt ltd"; LinkedIn spells it out for shops and uses the brand for the rest.
 GENERIC_EXCLUDED_MARKERS = ("hiring", "services pvt", "technologies pvt ltd",
-                            "solutions pvt", "infotech")
+                            "solutions pvt", "infotech", "private limited", "pvt",
+                            "solutions", "infoweb", "web applications",
+                            "information technologies")
 
 # Tier names that are also ordinary words ("Square Yards", "Notion Press",
 # "Target"), accepted only as the whole name — after legal suffixes are
@@ -116,7 +122,7 @@ AMBIGUOUS_NAMES = {
     "square", "block", "notion", "elastic", "discord", "plaid", "target",
     "booking", "visa", "millennium", "turing", "chime", "harness", "ripple",
     "affirm", "sigmoid", "amplitude", "cred",
-    "arm", "toast", "miro", "grab",
+    "arm", "toast", "miro", "grab", "motive",
 }
 
 _SUFFIX_RE = re.compile(
@@ -171,8 +177,9 @@ EUROPE_VISA_SPONSORS = (
 EUROPE_JOBS_PER_COMPANY = 8
 
 # What the India LinkedIn search asks for by name. One query each, so this
-# list is the request budget. Every name has to sit on a tier above, or the
-# company filter throws the hit away.
+# list is the request budget. A card from these queries is kept only when the
+# company is already on a tier. An unknown employer reaches the board from the
+# broad search, and only when the title is a software role.
 INDIA_COMPANY_SEARCH = (
     "Google", "Microsoft", "Amazon", "Apple", "NVIDIA", "Meta",
     "Adobe", "Salesforce", "Atlassian", "Uber", "Intuit", "ServiceNow",

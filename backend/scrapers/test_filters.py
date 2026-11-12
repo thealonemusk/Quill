@@ -213,16 +213,18 @@ def test_india_excluded_roles() -> None:
 
 
 def test_india_companies() -> None:
-    section("1d. India keeps known companies and drops the rest")
+    section("1d. India keeps tiered companies, and a software role at an unknown one")
     from backend.autopilot.select import INDIA_COMPANY_SEARCH, Tier, company_tier
-    from backend.scrapers.filter_utils import matches_region, passes_hard_filters
+    from backend.scrapers.filter_utils import (
+        india_company_block, matches_region, passes_hard_filters,
+    )
     from backend.scrapers.linkedin import india_company_queries
 
-    def kept(company: str, region: str = "india") -> bool:
+    def kept(company: str, region: str = "india", title: str = "Software Engineer") -> bool:
         location = "Bengaluru, Karnataka" if region == "india" else "London, United Kingdom"
         return passes_hard_filters(
             {
-                "title": "Software Engineer",
+                "title": title,
                 "company": company,
                 "location": location,
                 "jd_text": "We are hiring a software engineer to build APIs.",
@@ -232,13 +234,50 @@ def test_india_companies() -> None:
             require_jd=False,
         )[0]
 
-    for company in ("Google", "Intuit", "Flipkart", "Dream11", "Goldman Sachs Services Pvt Ltd"):
+    for company in (
+        "Google", "Intuit", "Flipkart", "Dream11",
+        "Goldman Sachs Services Pvt Ltd", "Pixel Forge", "Square Yards",
+    ):
         check(f"India keeps {company!r}", kept(company), True)
-    for company in ("Pixel Forge", "Infosys", "Square Yards", ""):
+    for company in (
+        "Infosys", "NetM Corporate Solutions", "TalentRabbit", "EXL",
+        "Rootlex Technologies Private Limited", "CXO Events", "Client of SCHS", "",
+    ):
         check(f"India drops {company!r}", kept(company), False)
-    check("stored unknown company stays off the board",
+    check("Talentica is not treated as a recruiter", kept("Talentica"), True)
+    check("unknown company keeps a backend title",
+          kept("Pixel Forge", title="Backend Engineer - SDE 1"), True)
+    for title in (
+        "AI Engineer", "Agentic AI Engineer", "AI/ML Engineer",
+        "Artificial Intelligence Engineer", "ML Engineer",
+        "Machine Learning Engineer", "Engineer - AI",
+    ):
+        check(f"unknown company keeps {title!r}", kept("Pixel Forge", title=title), True)
+    for title in (
+        "Data Engineer", "Java Developer", "Junior Web Developer",
+        "Full Stack Developer", "Software Developer", "AI Developer",
+        "Data Scientist",
+    ):
+        check(f"unknown company drops {title!r}", kept("Pixel Forge", title=title), False)
+    check("unknown company keeps a software development engineer",
+          kept("Pixel Forge", title="Software Development Engineer"), True)
+    check("Teradata software engineer slides", kept("Teradata"), True)
+    check("Teradata AI engineer slides", kept("Teradata", title="AI Engineer"), True)
+    check("a staffing firm stays out on an AI title",
+          kept("EXL", title="Artificial Intelligence Engineer"), False)
+    check("a company search without a title still drops an unknown name",
+          bool(india_company_block("Pixel Forge")), True)
+    check("a tiered company keeps a title the unknown gate would drop",
+          kept("Google", title="Data Engineer"), True)
+    check("stored unknown software role stays on the board",
           matches_region(
               {"title": "Software Engineer", "location": "Bengaluru", "company": "Pixel Forge",
+               "jd_text": "", "platform": "linkedin"},
+              "india",
+          ), True)
+    check("stored unknown data role stays off the board",
+          matches_region(
+              {"title": "Data Engineer", "location": "Bengaluru", "company": "Pixel Forge",
                "jd_text": "", "platform": "linkedin"},
               "india",
           ), False)
@@ -339,6 +378,13 @@ def test_tiers() -> None:
         ("Sprinklr", Tier.STRONG),
         ("Samsung Electronics", Tier.STRONG),
         ("Barclays", Tier.STRONG),
+        ("NatWest Group", Tier.STRONG),
+        ("TransUnion", Tier.STRONG),
+        ("Teradata", Tier.UNKNOWN),
+        ("Sauce Labs", Tier.KNOWN),
+        ("N-able", Tier.KNOWN),
+        ("Media.net", Tier.KNOWN),
+        ("Motive", Tier.KNOWN),
         ("Arm", Tier.STRONG),
         ("Pixel Forge", Tier.UNKNOWN),
     ):
@@ -349,7 +395,9 @@ def test_tiers() -> None:
                  "Wipro Limited", "HCLTech", "HCL Technologies", "Tata Consultancy Services",
                  "ABC Staffing Solutions", "XYZ Recruitment", "Capgemini Technology Services",
                  "Randstad India", "Acme Services Pvt Ltd", "Foo Technologies Pvt Ltd",
-                 "Bar Infotech", "Quick Hiring"):
+                 "Bar Infotech", "Quick Hiring", "EXL", "UST", "Capco", "WSP in India",
+                 "Rootlex Technologies Private Limited", "NetM Corporate Solutions",
+                 "MasterTech Web Applications"):
         check(f"{name!r} -> EXCLUDED", company_tier(name), Tier.EXCLUDED)
 
     section("6. Role fit: word-bounded ROLE_BAD")
