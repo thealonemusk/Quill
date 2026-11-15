@@ -404,6 +404,9 @@ def test_tiers() -> None:
         ("N-able", Tier.KNOWN),
         ("Media.net", Tier.KNOWN),
         ("Motive", Tier.KNOWN),
+        ("Cursor", Tier.STRONG),
+        ("Harvey", Tier.STRONG),
+        ("Harvey Nash", Tier.UNKNOWN),
         ("Arm", Tier.STRONG),
         ("Pixel Forge", Tier.UNKNOWN),
     ):

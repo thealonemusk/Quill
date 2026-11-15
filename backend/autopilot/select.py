@@ -72,7 +72,7 @@ STRONG = {
     "wells fargo", "bank of america", "capital one", "blackrock", "bloomberg",
     "experian", "philips", "delhivery", "dream11", "dream sports", "makemytrip",
     "pine labs", "urban company", "zepto", "juspay", "chargebee", "cohesity",
-    "natwest", "transunion",
+    "natwest", "transunion", "cursor", "harvey",
 }
 
 KNOWN = {
@@ -122,7 +122,7 @@ AMBIGUOUS_NAMES = {
     "square", "block", "notion", "elastic", "discord", "plaid", "target",
     "booking", "visa", "millennium", "turing", "chime", "harness", "ripple",
     "affirm", "sigmoid", "amplitude", "cred",
-    "arm", "toast", "miro", "grab", "motive",
+    "arm", "toast", "miro", "grab", "motive", "harvey",
 }
 
 _SUFFIX_RE = re.compile(
