@@ -25,7 +25,6 @@ _DISCOVERY_EXTRA_ROLES = [
     "Golang Developer",
     "Node.js Developer",
     "Cloud Engineer",
-    "Data Engineer",
 ]
 
 

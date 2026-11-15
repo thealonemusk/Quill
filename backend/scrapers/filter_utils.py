@@ -326,6 +326,10 @@ def india_excluded_role(title: str) -> str:
         return "Support Engineer"
     if _contains_marker(t, "dotnet") or ".net" in t or _contains_marker(t, "dot net"):
         return "Dotnet Developer"
+    # "database" and "metadata" do not contain this phrase. "Big Data" on a
+    # software title does not either.
+    if _contains_marker(t, "data engineer"):
+        return "Data Engineer"
     return ""
 
 

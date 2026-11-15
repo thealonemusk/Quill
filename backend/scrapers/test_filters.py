@@ -159,7 +159,7 @@ def test_location() -> None:
 
 
 def test_india_excluded_roles() -> None:
-    section("1c. India drops SRE, DevOps, Support Engineer, and Dotnet")
+    section("1c. India drops SRE, DevOps, Support Engineer, Dotnet, and Data Engineer")
     from backend.scrapers.company_careers import _role_matches
     from backend.scrapers.filter_utils import matches_region, passes_hard_filters
     from backend.scrapers.registry import resolve_discovery_roles
@@ -188,9 +188,15 @@ def test_india_excluded_roles() -> None:
         ".NET Developer",
         "Dot Net Developer",
         "ASP.NET Developer",
+        "Data Engineer",
+        "Data Engineer-Data Platforms-Google",
+        "Senior Data Engineer",
     ):
         check(f"India drops {title!r}", kept(title), False)
     check("India keeps Software Engineer", kept("Software Engineer"), True)
+    check("India keeps a software title about big data",
+          kept("Software Engineer, Big Data"), True)
+    check("India keeps Database Engineer", kept("Database Engineer"), True)
     check("India keeps Customer Support Platform",
           kept("Software Engineer, Customer Support Platform"), True)
     check("India keeps Backend Engineer", kept("Backend Engineer"), True)
@@ -203,6 +209,7 @@ def test_india_excluded_roles() -> None:
     check("Europe keeps DevOps Engineer", kept("DevOps Engineer", "europe"), True)
     check("Europe keeps Site Reliability Engineer",
           kept("Site Reliability Engineer", "europe"), True)
+    check("Europe keeps Data Engineer", kept("Data Engineer", "europe"), True)
     roles = ["Software Engineer", "Backend Engineer"]
     check("career sites do not treat DevOps as software",
           _role_matches("DevOps Engineer", roles), False)
@@ -210,6 +217,7 @@ def test_india_excluded_roles() -> None:
           _role_matches("Site Reliability Engineer", roles), False)
     discovered = [r.lower() for r in resolve_discovery_roles(roles)]
     check("India search does not ask for DevOps", "devops engineer" not in discovered, True)
+    check("India search does not ask for Data Engineer", "data engineer" not in discovered, True)
 
 
 def test_india_companies() -> None:
@@ -268,7 +276,9 @@ def test_india_companies() -> None:
     check("a company search without a title still drops an unknown name",
           bool(india_company_block("Pixel Forge")), True)
     check("a tiered company keeps a title the unknown gate would drop",
-          kept("Google", title="Data Engineer"), True)
+          kept("Google", title="Java Developer"), True)
+    check("India drops Data Engineer at a known company",
+          kept("Google", title="Data Engineer"), False)
     check("stored unknown software role stays on the board",
           matches_region(
               {"title": "Software Engineer", "location": "Bengaluru", "company": "Pixel Forge",
