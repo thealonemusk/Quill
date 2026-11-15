@@ -25,9 +25,9 @@ EXCLUDED_TITLE_REGEXES = [
     r'\b(?:ii|iii|iv|v)(?:new)?\b',
     r'\bl[2-7]\b',
     # A standalone level number: "Engineer 2", "SDE - 3". The digit must end the
-    # token — without `(?![\d.a-z])` this read " 2026" in "2026 New Grad", "5G"
-    # and "3D" as levels and rejected exactly the entry-level roles we want.
-    r'(?<!\d)[-_\s](?:2|3|4|5)(?![\d.a-z])(?!(?:\s*\+|\s*(?:years?|yrs?|yr|y)\b|\s+to\s+\d))',
+    # token — without `(?![\d.a-z-])` this read " 2026" in "2026 New Grad", "5G"
+    # and "3D" as levels, and "4-9 years" as Engineer 4.
+    r'(?<!\d)[-_\s](?:2|3|4|5)(?![\d.a-z-])(?!(?:\s*\+|\s*(?:years?|yrs?|yr|y)\b|\s+to\s+\d))',
 ]
 
 MAX_JD_EXPERIENCE_YEARS = 2.0

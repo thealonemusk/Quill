@@ -632,13 +632,14 @@ async def scrape_company_career_jobs(
     search_roles = _expanded_search_roles(roles)
     # Famous boards first. A stopped scan should have spent its time on them,
     # not on the long tail of boards that never match.
-    from backend.autopilot.select import company_tier
+    from backend.autopilot.select import Tier, company_tier
 
     company_list = sorted(
         companies or TOP_COMPANIES,
         key=lambda company: int(company_tier(company.get("name") or "")),
         reverse=True,
     )
+
     all_jobs: List[dict] = []
 
     # Dispatch each company scraper in a thread to avoid blocking the event loop
@@ -646,6 +647,11 @@ async def scrape_company_career_jobs(
         ctype = company.get("type", "skip")
         name = company.get("name", "?")
         if ctype == "skip":
+            return []
+        # Accenture's Workday board answered every role search, and the filter
+        # then dropped each hit. An excluded name never belongs on the board.
+        if company_tier(name) is Tier.EXCLUDED:
+            logger.info(f"Career site skipped {name}: excluded company")
             return []
         try:
             if ctype == "greenhouse":

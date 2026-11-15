@@ -314,6 +314,7 @@ def test_titles() -> None:
         "Software Engineer, Cloud Architecture",
         "Software Engineer I",
         "SDE 1",
+        "Software Engineer | 1-2 years",
     ):
         check(f"{title!r} accepted", _title_ok(title), True)
 
@@ -328,6 +329,14 @@ def test_titles() -> None:
         "Software Engineering Intern",
     ):
         check(f"{title!r} rejected", _title_ok(title), False)
+    ok, reason = is_job_experience_valid(
+        {"title": "Software Engineer (Networking protocols | 4-9 years | Bangalore)",
+         "jd_text": ""},
+        require_jd=False,
+    )
+    check("a year range in the title is still over the cap", ok, False)
+    check("a year range is not read as a seniority level",
+          "years of experience" in reason, True)
 
 
 # ── 3. Experience ────────────────────────────────────────────────────────────

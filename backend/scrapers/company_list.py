@@ -367,14 +367,16 @@ TOP_COMPANIES = [
     },
     {
         "name": "LinkedIn",
-        "type": "greenhouse",
+        "type": "skip",
         "api_id": "linkedin",
+        "reason": "Greenhouse board 404; LinkedIn stays manual",
         "location_filter": INDIA_LOCS,
     },
     {
         "name": "Amplitude",
-        "type": "greenhouse",
+        "type": "skip",
         "api_id": "amplitude",
+        "reason": "Greenhouse board 404",
         "location_filter": INDIA_LOCS,
     },
     {
@@ -573,10 +575,11 @@ TOP_COMPANIES = [
     # ──────────────────── Workday ATS (verified) ─────────────────────
     {
         "name": "Accenture India",
-        "type": "workday",
+        "type": "skip",
         "tenant": "accenture",
         "api_id": "accenturecareers",
         "wd": "wd103",
+        "reason": "excluded company; a Workday sweep cannot reach the board",
         "location_filter": INDIA_LOCS,
     },
     {
