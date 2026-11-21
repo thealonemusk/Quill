@@ -159,7 +159,7 @@ def test_location() -> None:
 
 
 def test_india_excluded_roles() -> None:
-    section("1c. India drops SRE, DevOps, Support Engineer, Dotnet, and Data Engineer")
+    section("1c. India drops SRE, DevOps, Support, Dotnet, Data Engineer, and testing")
     from backend.scrapers.company_careers import _role_matches
     from backend.scrapers.filter_utils import matches_region, passes_hard_filters
     from backend.scrapers.registry import resolve_discovery_roles
@@ -191,9 +191,22 @@ def test_india_excluded_roles() -> None:
         "Data Engineer",
         "Data Engineer-Data Platforms-Google",
         "Senior Data Engineer",
+        "SDET – I (Software Development Engineer in Test)",
+        "SDET, Portworx",
+        "Software Development Engineer in Test",
+        "Software Engineer in Test",
+        "Software Engineer Test",
+        "Software Engineer, Test",
+        "Software Engineer - UI Test",
+        "Test Engineer",
+        "Software QA Engineer",
+        "QA Engineer",
+        "Quality Assurance Engineer",
     ):
         check(f"India drops {title!r}", kept(title), False)
     check("India keeps Software Engineer", kept("Software Engineer"), True)
+    check("India keeps a title that merely contains the letters test",
+          kept("Software Engineer, Latest"), True)
     check("India keeps a software title about big data",
           kept("Software Engineer, Big Data"), True)
     check("India keeps Database Engineer", kept("Database Engineer"), True)
@@ -210,6 +223,7 @@ def test_india_excluded_roles() -> None:
     check("Europe keeps Site Reliability Engineer",
           kept("Site Reliability Engineer", "europe"), True)
     check("Europe keeps Data Engineer", kept("Data Engineer", "europe"), True)
+    check("Europe keeps SDET", kept("SDET", "europe"), True)
     roles = ["Software Engineer", "Backend Engineer"]
     check("career sites do not treat DevOps as software",
           _role_matches("DevOps Engineer", roles), False)

@@ -330,6 +330,12 @@ def india_excluded_role(title: str) -> str:
     # software title does not either.
     if _contains_marker(t, "data engineer"):
         return "Data Engineer"
+    # Whole words, so "latest" and "contest" are not testing roles. "SDET – I"
+    # still matches: the dash is not a letter.
+    if (_contains_marker(t, "sdet") or _contains_marker(t, "qa")
+            or _contains_marker(t, "tester") or _contains_marker(t, "testing")
+            or _contains_marker(t, "test") or _contains_marker(t, "quality assurance")):
+        return "Testing"
     return ""
 
 
