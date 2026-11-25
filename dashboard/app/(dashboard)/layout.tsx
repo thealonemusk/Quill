@@ -1,8 +1,10 @@
 import { Sidebar } from '@/components/Sidebar';
+import { KeepAlive } from '@/components/KeepAlive';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen bg-[var(--bg)]">
+      <KeepAlive />
       <Sidebar />
       {/* min-w-0 is what stops a wide table forcing the whole flex row wider
           than the screen — without it the page scrolls sideways on a phone. */}
