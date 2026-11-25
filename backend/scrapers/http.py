@@ -35,8 +35,11 @@ MAX_RETRY_AFTER_SEC = 30.0
 # within the first minute — after which every retry just extends it. Pacing is
 # the fix; the backoff below is only the safety net.
 HOST_MIN_INTERVAL: Dict[str, float] = {
-    "www.linkedin.com": 1.2,
-    "linkedin.com": 1.2,
+    "www.linkedin.com": 2.5,
+    "linkedin.com": 2.5,
+    # One Render address. Workday limits that address, not each tenant hostname,
+    # so intel.wd1 and nvidia.wd5 have to share a queue.
+    "myworkdayjobs.com": 2.0,
 }
 DEFAULT_MIN_INTERVAL = 0.0
 
@@ -66,8 +69,15 @@ def _host_of(url: str) -> str:
         return ""
 
 
+def _pace_key(host: str) -> str:
+    if host.endswith(".myworkdayjobs.com"):
+        return "myworkdayjobs.com"
+    return host
+
+
 def _await_turn(host: str) -> None:
     """Block until this host's minimum interval has elapsed."""
+    host = _pace_key(host)
     interval = HOST_MIN_INTERVAL.get(host, DEFAULT_MIN_INTERVAL)
     if not interval:
         return
@@ -85,6 +95,7 @@ def _await_turn(host: str) -> None:
 
 
 def _check_cooldown(host: str) -> None:
+    host = _pace_key(host)
     with _limiter_lock:
         until = _cooldown_until.get(host, 0.0)
         if until and time.monotonic() < until:
@@ -96,6 +107,7 @@ def _check_cooldown(host: str) -> None:
 
 
 def _note_rate_limited(host: str) -> None:
+    host = _pace_key(host)
     with _limiter_lock:
         _strikes[host] = _strikes.get(host, 0) + 1
         if _strikes[host] >= RATE_LIMIT_STRIKES:
@@ -108,6 +120,7 @@ def _note_rate_limited(host: str) -> None:
 
 
 def _note_ok(host: str) -> None:
+    host = _pace_key(host)
     if _strikes.get(host):
         with _limiter_lock:
             _strikes[host] = 0
@@ -161,6 +174,9 @@ def _backoff_delay(attempt: int, response: Optional[requests.Response]) -> float
         explicit = _retry_after_seconds(response)
         if explicit is not None:
             return explicit
+        if response.status_code == 429:
+            delay = min(6.0 * (2 ** attempt), 20.0)
+            return delay + random.uniform(0, 1.0)
     delay = min(BASE_DELAY_SEC * (2 ** attempt), MAX_DELAY_SEC)
     return delay + random.uniform(0, 0.5)
 
@@ -209,7 +225,10 @@ def request(
         if response.status_code not in RETRYABLE_STATUSES:
             _note_ok(host)
             return response
-        if attempt == max_retries:
+        # A 429 that is retried four more times, across twelve companies, is
+        # what turns a short limit into a block. Two retries, then stop.
+        limited = response.status_code == 429
+        if attempt == max_retries or (limited and attempt >= 2):
             logger.warning(
                 f"HTTP {response.status_code} after {max_retries + 1} attempts: {url}"
             )

@@ -373,6 +373,14 @@ def _resolve_workday_host(
             if resp.status_code == 200:
                 logger.debug(f"Workday host resolved: {host}")
                 return host
+            if http.is_rate_limited(resp):
+                logger.warning(
+                    f"Workday {host} is rate-limiting; not probing other datacenters"
+                )
+                return None
+        except http.RateLimited as exc:
+            logger.warning(f"Workday host probe stopped: {exc}")
+            return None
         except requests.RequestException as exc:
             logger.debug(f"Workday host probe failed for {host}: {exc}")
     return None
@@ -456,6 +464,8 @@ def _scrape_workday(company: dict, roles: List[str]) -> List[dict]:
                 if resp.status_code != 200:
                     if page == 0:
                         logger.warning(f"Workday {name} ({role}): HTTP {resp.status_code}")
+                    if http.is_rate_limited(resp):
+                        return results
                     break
                 batch = resp.json().get("jobPostings", [])
                 postings.extend(batch)
@@ -506,6 +516,9 @@ def _scrape_workday(company: dict, roles: List[str]) -> List[dict]:
                 if _passes_career_filters(job_data):
                     results.append(job_data)
 
+        except http.RateLimited as exc:
+            logger.warning(f"Workday {name}: {exc}")
+            break
         except Exception as e:
             logger.warning(f"Workday {name} ({role}): {e}")
 
@@ -660,7 +673,7 @@ async def scrape_company_career_jobs(
             return []
 
     # Cap concurrency so a full board list does not hit every host at once.
-    semaphore = asyncio.Semaphore(12)
+    semaphore = asyncio.Semaphore(3)
 
     async def rate_limited_scrape(company: dict) -> List[dict]:
         if should_stop():
