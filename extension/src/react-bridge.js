@@ -11,21 +11,21 @@
  *
  * Protocol, synchronous both ways (dispatchEvent runs listeners before it
  * returns, whichever world they live in):
- *   the caller tags the input with data-tempoapply-react=<token>, dispatches
- *   "tempoapply:react" on document with a JSON string detail
+ *   the caller tags the input with data-Quill-react=<token>, dispatches
+ *   "Quill:react" on document with a JSON string detail
  *   {token, op: "probe" | "keydown", key?, value?}, and reads the answer
- *   from data-tempoapply-react-result: "ok", "noprops" or "error".
+ *   from data-Quill-react-result: "ok", "noprops" or "error".
  *
  * Detail is a string because objects do not cross worlds reliably. This only
  * ever calls the page's own handler on the page's own element, so a page
  * script driving it gains nothing it did not already have.
  */
 (() => {
-  if (window.__tempoapplyReactBridge) return;
-  window.__tempoapplyReactBridge = true;
+  if (window.__QuillReactBridge) return;
+  window.__QuillReactBridge = true;
 
-  const TAG = "data-tempoapply-react";
-  const RESULT = "data-tempoapply-react-result";
+  const TAG = "data-Quill-react";
+  const RESULT = "data-Quill-react-result";
 
   function reactProps(el) {
     for (const key in el) {
@@ -34,7 +34,7 @@
     return null;
   }
 
-  document.addEventListener("tempoapply:react", (ev) => {
+  document.addEventListener("Quill:react", (ev) => {
     let msg;
     try {
       msg = JSON.parse(ev.detail);

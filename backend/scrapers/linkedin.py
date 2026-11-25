@@ -14,8 +14,12 @@ from loguru import logger
 
 from backend.scrapers import http
 from backend.scrapers.base import normalize_job
-from backend.scrapers.filter_utils import ENTRY_TITLE_SIGNALS, passes_hard_filters
-from backend.scrapers.registry import resolve_discovery_roles
+from backend.scrapers.filter_utils import (
+    ENTRY_TITLE_SIGNALS,
+    EUROPE_SEARCH_LOCATIONS,
+    passes_hard_filters,
+)
+from backend.scrapers.registry import resolve_discovery_roles, resolve_roles
 from backend.scan_control import should_stop
 from backend.config import settings
 from backend.job_freshness import LINKEDIN_TIME_FILTER
@@ -54,6 +58,17 @@ SKIP_SEARCH_LOCATIONS = {"remote", "work from home", "wfh", "anywhere"}
 from backend.scrapers.filter_utils import EXCLUDED_CITIES
 
 LINKEDIN_PAGES = 3
+# One page per city. Three pages across six cities is what left a Europe
+# scan fetching descriptions long after the list still looked empty.
+EUROPE_LINKEDIN_PAGES = 1
+# The previous cap stopped after the first 18 employers, which is why the
+# Europe list sat at ~26. This is how many title-clean listings to keep
+# before fetching descriptions.
+EUROPE_LISTING_CAP = 120
+EUROPE_ROLE_QUERIES = 2
+EUROPE_PER_COMPANY = 8
+INDIA_COMPANY_CAP = 120
+INDIA_PER_COMPANY = 8
 PAGE_SIZE = 10
 
 # Two JD fetches per listing, and the search pages are still going. Six
@@ -190,12 +205,74 @@ def _scrape_job_detail_bs4(url: str) -> dict:
     return empty
 
 
+def linkedin_page_count(region: str) -> int:
+    return EUROPE_LINKEDIN_PAGES if region == "europe" else LINKEDIN_PAGES
+
+
+def europe_sponsor_queries(roles) -> List[tuple]:
+    """Each sponsor, in each Europe country, for the first target roles.
+
+    Amazon is searched on its own API. "j.p. morgan" is the same employer
+    as "jpmorgan".
+    """
+    from backend.autopilot.select import EUROPE_VISA_SPONSORS
+
+    if isinstance(roles, str):
+        roles = [roles]
+    chosen: List[str] = []
+    seen_roles: Set[str] = set()
+    for role in roles or []:
+        text = (role or "").strip()
+        key = text.lower()
+        if not text or key in seen_roles:
+            continue
+        seen_roles.add(key)
+        chosen.append(text)
+        if len(chosen) >= EUROPE_ROLE_QUERIES:
+            break
+    if not chosen:
+        chosen = ["Software Engineer"]
+
+    places = ("United Kingdom", "Ireland", "Germany", "Netherlands", "Sweden")
+    skip = {"amazon", "j.p. morgan"}
+    queries = []
+    for role in chosen:
+        for company in EUROPE_VISA_SPONSORS:
+            if company in skip:
+                continue
+            for place in places:
+                queries.append((f"{role} {company}", place))
+    return queries
+
+
+def india_company_queries(roles) -> List[tuple]:
+    """The first target role, at each named company, in India.
+
+    One page of one role. A second role would double the request count, and
+    the broad city search still runs afterwards.
+    """
+    from backend.autopilot.select import INDIA_COMPANY_SEARCH
+
+    if isinstance(roles, str):
+        roles = [roles]
+    role = "Software Engineer"
+    for item in roles or []:
+        text = (item or "").strip()
+        if text:
+            role = text
+            break
+    return [(f"{role} {company}", "India") for company in INDIA_COMPANY_SEARCH]
+
+
 def _collect_listings(
     roles: List[str],
     locations: List[str],
     max_jobs: int,
+    pages: int = LINKEDIN_PAGES,
+    seen_urls: Optional[Set[str]] = None,
 ) -> List[dict]:
-    seen_urls: Set[str] = set()
+    if seen_urls is None:
+        seen_urls = set()
     listings: List[dict] = []
     failed_pages = 0
 
@@ -203,7 +280,7 @@ def _collect_listings(
         for role in roles:
             for query in _search_queries(role):
                 for location in locations:
-                    for page in range(LINKEDIN_PAGES):
+                    for page in range(pages):
                         if should_stop():
                             return listings
                         start = page * PAGE_SIZE
@@ -250,7 +327,9 @@ def _collect_listings(
                                 "jd_text": "",
                                 "platform": "linkedin",
                             }
-                            ok, _ = passes_hard_filters(preview, require_jd=False)
+                            ok, _ = passes_hard_filters(
+                                preview, require_jd=False, region=settings.active_region,
+                            )
                             if not ok:
                                 continue
 
@@ -272,36 +351,165 @@ def _collect_listings(
     return listings
 
 
+def _collect_india_company_listings(roles, max_jobs: int) -> List[dict]:
+    """Named companies first. A role-only search is mostly shops nobody wants."""
+    from backend.scrapers.filter_utils import india_company_block
+
+    listings: List[dict] = []
+    seen_urls: Set[str] = set()
+    per_company: dict = {}
+    failed_pages = 0
+    for keywords, location in india_company_queries(roles):
+        if should_stop() or len(listings) >= max_jobs:
+            break
+        try:
+            batch = _fetch_search_page(keywords, location, 0, LINKEDIN_TIME_FILTER)
+        except http.RateLimited as exc:
+            logger.warning(f"LinkedIn stopped early: {exc}")
+            break
+        except Exception as exc:
+            logger.warning(f"LinkedIn page failed for '{keywords}' / '{location}': {exc}")
+            failed_pages += 1
+            if failed_pages >= MAX_FAILED_PAGES:
+                break
+            continue
+        if not batch:
+            continue
+        for item in batch:
+            url = item["url"]
+            if url in seen_urls:
+                continue
+            company = item.get("company") or ""
+            if india_company_block(company):
+                continue
+            key = company.lower()
+            if per_company.get(key, 0) >= INDIA_PER_COMPANY:
+                continue
+            seen_urls.add(url)
+            preview = {
+                "title": item["title"],
+                "company": company,
+                "location": item["location"] or location,
+                "url": url,
+                "jd_text": "",
+                "platform": "linkedin",
+            }
+            ok, _ = passes_hard_filters(
+                preview, require_jd=False, region="india",
+            )
+            if not ok:
+                continue
+            listings.append(preview)
+            per_company[key] = per_company.get(key, 0) + 1
+            if len(listings) >= max_jobs:
+                break
+    if failed_pages:
+        logger.warning(
+            f"LinkedIn: {failed_pages} company searches failed after retries"
+        )
+    return listings
+
+
+def _collect_sponsor_listings(roles, max_jobs: int) -> List[dict]:
+    """Search known sponsors. A bare role search was mostly recruiters."""
+    from backend.autopilot.select import sponsors_europe_visa
+
+    listings: List[dict] = []
+    seen_urls: Set[str] = set()
+    per_company: dict = {}
+    failed_pages = 0
+    for keywords, location in europe_sponsor_queries(roles):
+        if should_stop() or len(listings) >= max_jobs:
+            break
+        try:
+            batch = _fetch_search_page(keywords, location, 0, LINKEDIN_TIME_FILTER)
+        except http.RateLimited as exc:
+            logger.warning(f"LinkedIn stopped early: {exc}")
+            break
+        except Exception as exc:
+            logger.warning(f"LinkedIn page failed for '{keywords}' / '{location}': {exc}")
+            failed_pages += 1
+            if failed_pages >= MAX_FAILED_PAGES:
+                break
+            continue
+        if not batch:
+            continue
+        for item in batch:
+            url = item["url"]
+            if url in seen_urls:
+                continue
+            company = item.get("company") or ""
+            if not sponsors_europe_visa(company):
+                continue
+            key = company.lower()
+            if per_company.get(key, 0) >= EUROPE_PER_COMPANY:
+                continue
+            seen_urls.add(url)
+            preview = {
+                "title": item["title"],
+                "company": company,
+                "location": item["location"] or location,
+                "url": url,
+                "jd_text": "",
+                "platform": "linkedin",
+            }
+            ok, _ = passes_hard_filters(
+                preview, require_jd=False, region=settings.active_region,
+            )
+            if not ok:
+                continue
+            listings.append(preview)
+            per_company[key] = per_company.get(key, 0) + 1
+            if len(listings) >= max_jobs:
+                break
+    if failed_pages:
+        logger.warning(
+            f"LinkedIn: {failed_pages} sponsor searches failed after retries"
+        )
+    return listings
+
+
 def _enrich_listings(listings: List[dict]) -> List[dict]:
     if not listings:
         return []
 
-    with ThreadPoolExecutor(max_workers=JD_WORKERS) as pool:
-        details = list(pool.map(_scrape_job_detail_bs4, [j["url"] for j in listings]))
-
     reasons: Counter = Counter()
     enriched = []
-    for listing, detail in zip(listings, details):
-        job_data = {**listing, **detail, "platform": "linkedin"}
-        ok, reason = passes_hard_filters(
-            job_data,
-            require_jd=not _has_entry_title(job_data.get("title", "")),
-        )
-        if not ok:
-            if "JD missing" in reason:
-                reasons["jd_missing"] += 1
-            elif "more than" in reason:
-                reasons["experience_over_2y"] += 1
-            elif "excluded" in reason.lower() or "excluded level" in reason.lower():
-                reasons["senior_title"] += 1
-            elif "Frontend" in reason:
-                reasons["frontend"] += 1
-            elif "intern" in reason.lower():
-                reasons["intern"] += 1
-            else:
-                reasons["location_or_other"] += 1
-            continue
-        enriched.append(normalize_job(job_data, "linkedin"))
+    # Stop between batches. One pool over the whole list ignores the stop
+    # flag until every description has been fetched, so a cancelled scan
+    # stored nothing.
+    step = max(JD_WORKERS * 4, 1)
+    for start in range(0, len(listings), step):
+        if should_stop():
+            logger.info("LinkedIn: stop requested — keeping descriptions fetched so far")
+            break
+        chunk = listings[start:start + step]
+        with ThreadPoolExecutor(max_workers=JD_WORKERS) as pool:
+            details = list(pool.map(_scrape_job_detail_bs4, [j["url"] for j in chunk]))
+        for listing, detail in zip(chunk, details):
+            job_data = {**listing, **detail, "platform": "linkedin"}
+            ok, reason = passes_hard_filters(
+                job_data,
+                require_jd=not _has_entry_title(job_data.get("title", "")),
+                region=settings.active_region,
+            )
+            if not ok:
+                if "JD missing" in reason:
+                    reasons["jd_missing"] += 1
+                elif "more than" in reason:
+                    reasons["experience_over_2y"] += 1
+                elif "Unknown company" in reason or reason.startswith("Excluded company"):
+                    reasons["company"] += 1
+                elif "excluded" in reason.lower() or "excluded level" in reason.lower():
+                    reasons["senior_title"] += 1
+                elif "Frontend" in reason:
+                    reasons["frontend"] += 1
+                elif "intern" in reason.lower():
+                    reasons["intern"] += 1
+                else:
+                    reasons["location_or_other"] += 1
+                continue
+            enriched.append(normalize_job(job_data, "linkedin"))
     if reasons:
         logger.info(f"LinkedIn: dropped {sum(reasons.values())} after JD — {dict(reasons)}")
     return enriched
@@ -317,18 +525,43 @@ async def scrape_linkedin_jobs(
     Main LinkedIn scraper entry point.
     Returns list of normalized job dicts.
     """
-    roles = resolve_discovery_roles(roles or settings.target_roles_list)
-    locations = _merge_locations(locations or settings.preferred_locations_list)
-
-    logger.info(f"LinkedIn: searching {len(roles)} roles across {len(locations)} locations")
-
-    searches = len(roles) * len(locations) * LINKEDIN_PAGES
-    logger.info(
-        f"LinkedIn: searching {len(roles)} roles x {len(locations)} locations "
-        f"x {LINKEDIN_PAGES} pages = up to {searches} requests"
-    )
-
-    listings = await asyncio.to_thread(_collect_listings, roles, locations, max_jobs)
+    if settings.active_region == "europe":
+        # A role-only search returned recruiters. Ask for known sponsors,
+        # and keep Amazon on its own API where it can be capped.
+        roles = resolve_roles(settings.target_roles_list)
+        max_jobs = min(max_jobs, EUROPE_LISTING_CAP)
+        queries = europe_sponsor_queries(roles)
+        logger.info(
+            f"LinkedIn: {len(queries)} sponsor searches "
+            f"(cap {max_jobs} listings)"
+        )
+        listings = await asyncio.to_thread(_collect_sponsor_listings, roles, max_jobs)
+    else:
+        roles = resolve_discovery_roles(roles or settings.target_roles_list)
+        locations = _merge_locations(locations or settings.preferred_locations_list)
+        pages = linkedin_page_count("india")
+        company_cap = min(max_jobs, INDIA_COMPANY_CAP)
+        logger.info(
+            f"LinkedIn: {len(india_company_queries(roles))} company searches "
+            f"(cap {company_cap} listings)"
+        )
+        company_listings = await asyncio.to_thread(
+            _collect_india_company_listings, roles, company_cap,
+        )
+        seen = {item["url"] for item in company_listings}
+        remaining = max(0, max_jobs - len(company_listings))
+        logger.info(f"LinkedIn: searching {len(roles)} roles across {len(locations)} locations")
+        searches = len(roles) * len(locations) * pages
+        logger.info(
+            f"LinkedIn: searching {len(roles)} roles x {len(locations)} locations "
+            f"x {pages} pages = up to {searches} requests"
+        )
+        broad = []
+        if remaining:
+            broad = await asyncio.to_thread(
+                _collect_listings, roles, locations, remaining, pages, seen,
+            )
+        listings = company_listings + broad
     logger.info(f"LinkedIn: {len(listings)} listings passed title pre-filter")
 
     jobs = await asyncio.to_thread(_enrich_listings, listings)

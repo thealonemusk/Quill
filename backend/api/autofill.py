@@ -25,6 +25,7 @@ from sqlalchemy.orm import Session
 from backend import seen_ledger
 from backend.applier.ats import detect_ats
 from backend.applier.fields import (
+    APPLY_REGION,
     JOB_LOCATION,
     OPTION_FALLBACKS,
     is_consent_label,
@@ -35,6 +36,7 @@ from backend.applier.fields import (
     resolve_value,
 )
 from backend.applier.profile import ApplicantProfile, load_profile
+from backend.config import settings
 from backend.applier.sections import KINDS, needed_counts, section_value, skill_list
 from backend.db.models import Job, get_db
 
@@ -481,6 +483,7 @@ def resolve(req: ResolveRequest, db: Session = Depends(get_db)):
     # "Will you require sponsorship?" means sponsorship where the job is. Only
     # a known job has a location; an unknown page leaves such questions blank.
     token = JOB_LOCATION.set((job.location if job else "") or "")
+    region_token = APPLY_REGION.set(settings.active_region)
     try:
         for field in req.fields:
             if (field.type or "").lower() == "radio":
@@ -492,6 +495,7 @@ def resolve(req: ResolveRequest, db: Session = Depends(get_db)):
             fills.extend(_resolve_radio_group(profile, group, job_title, company))
     finally:
         JOB_LOCATION.reset(token)
+        APPLY_REGION.reset(region_token)
 
     actionable = [f for f in fills if f.action != "skip"]
     answered = {f.idx for f in actionable}

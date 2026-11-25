@@ -11,7 +11,6 @@ _FALLBACK_ROLES = [
     "AI Engineer",
     "Software Developer",
     "Platform Engineer",
-    "DevOps Engineer",
     "SDE",
     "Machine Learning Engineer",
 ]
@@ -26,7 +25,6 @@ _DISCOVERY_EXTRA_ROLES = [
     "Golang Developer",
     "Node.js Developer",
     "Cloud Engineer",
-    "Data Engineer",
 ]
 
 
@@ -60,6 +58,37 @@ async def _run_company_careers(roles, max_jobs, headless):
     return await scrape_company_career_jobs(roles=roles, max_jobs=max_jobs)
 
 
+async def _run_amazon(roles, max_jobs, headless):
+    import asyncio
+
+    from backend.config import settings
+    from backend.scrapers.bigtech import scrape_amazon
+
+    if settings.active_region == "europe":
+        from backend.autopilot.select import EUROPE_JOBS_PER_COMPANY
+        roles = resolve_roles(settings.target_roles_list)
+        max_jobs = min(max_jobs, EUROPE_JOBS_PER_COMPANY)
+    return await asyncio.to_thread(scrape_amazon, roles, max_jobs)
+
+
+async def _run_microsoft(roles, max_jobs, headless):
+    from backend.config import settings
+    from backend.scrapers.bigtech import scrape_microsoft
+
+    if settings.active_region == "europe":
+        roles = resolve_roles(settings.target_roles_list)
+    return await scrape_microsoft(roles, max_jobs, headless=False)
+
+
+async def _run_google(roles, max_jobs, headless):
+    from backend.config import settings
+    from backend.scrapers.bigtech import scrape_google
+
+    if settings.active_region == "europe":
+        roles = resolve_roles(settings.target_roles_list)
+    return await scrape_google(roles, max_jobs, headless=False)
+
+
 async def _run_bigtech(roles, max_jobs, headless):
     """
     Amazon, Microsoft and Google — each runs its own ATS, none speaks
@@ -89,6 +118,9 @@ SCRAPER_REGISTRY: Dict[str, ScrapeFn] = {
     "wellfound": _run_wellfound,
     "company_careers": _run_company_careers,
     "bigtech": _run_bigtech,
+    "amazon": _run_amazon,
+    "microsoft": _run_microsoft,
+    "google": _run_google,
 }
 
 SCRAPER_LABELS = {
@@ -99,6 +131,9 @@ SCRAPER_LABELS = {
     "wellfound": "Wellfound",
     "company_careers": "Company Careers",
     "bigtech": "Amazon / Microsoft / Google",
+    "amazon": "Amazon",
+    "microsoft": "Microsoft",
+    "google": "Google",
     "manual": "Manual",
 }
 

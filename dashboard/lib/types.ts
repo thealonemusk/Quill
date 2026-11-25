@@ -32,6 +32,8 @@ export interface Job {
   ats_type?: string;
   apply_status?: string;
   apply_error?: string;
+  tier?: string;
+  tier_value?: number;
 }
 
 export interface Analytics {
@@ -45,6 +47,7 @@ export interface SettingsData {
   target_roles: string[];
   experience_years: number;
   preferred_locations: string[];
+  target_region: 'india' | 'europe';
   min_relevance_score: number;
   user_full_name: string;
   has_gemini_key: boolean;

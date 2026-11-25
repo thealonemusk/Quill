@@ -32,10 +32,9 @@ async def scrape_wellfound_jobs(
         page = await ctx.new_page()
 
         for role in roles:
-            # Map role name to slug
             slug = ROLE_SLUGS.get(role.lower().strip(), role.lower().strip().replace(" ", "-"))
             url = f"https://wellfound.com/role/l/{slug}/india"
-            logger.info(f"🔍 Wellfound: Navigating to {url}...")
+            logger.info(f"Wellfound: navigating to {url}")
 
             try:
                 await page.goto(url, timeout=30000)
@@ -52,7 +51,6 @@ async def scrape_wellfound_jobs(
                 data = json.loads(next_data_el.string)
                 apollo_state = data.get("props", {}).get("pageProps", {}).get("apolloState", {}).get("data", {})
 
-                # Find all StartupResults
                 startup_keys = [k for k in apollo_state.keys() if k.startswith("StartupResult:")]
                 
                 job_count = 0
@@ -73,15 +71,11 @@ async def scrape_wellfound_jobs(
                         title = job_data.get("title", "")
                         job_id = job_data.get("id", "")
                         slug_title = job_data.get("slug", "")
-                        
-                        # Location text
+
                         loc_names = job_data.get("locationNames", [])
                         location = ", ".join(loc_names) if loc_names else "India"
-
-                        # Build URL
                         job_url = f"https://wellfound.com/jobs/{job_id}-{slug_title}" if job_id else url
 
-                        # JD description
                         jd_text = job_data.get("description", "")
                         if jd_text:
                             jd_soup = BeautifulSoup(jd_text, "html.parser")

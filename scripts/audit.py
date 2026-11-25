@@ -377,7 +377,7 @@ def check_scrape_budget() -> None:
 
 SENSITIVE_PATHS = (
     "config/.env", "config/.env.example", ".env", "config/workday_accounts.json",
-    "config/applicant_profile.json", "tempoapply.db", "data/browser_state.json",
+    "config/applicant_profile.json", "Quill.db", "data/browser_state.json",
 )
 # Shapes of real credentials. Printed as file + first three characters only.
 SECRET_PATTERNS = (

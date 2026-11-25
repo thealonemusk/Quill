@@ -61,7 +61,18 @@ STRONG = {
     "goldman sachs", "morgan stanley", "jpmorgan", "j.p. morgan", "visa",
     "mastercard", "paypal", "walmart", "target", "expedia", "booking",
     "thoughtworks", "tower research", "d. e. shaw", "de shaw", "optiver",
-    "jane street", "millennium", "graviton", "quadeye",
+    "jane street", "millennium", "graviton", "quadeye", "rubrik", "pure storage",
+    # Product companies and bank tech with a real India engineering office.
+    # A generic LinkedIn query buries these under staffing shops.
+    "intuit", "servicenow", "workday", "hubspot", "shopify", "doordash",
+    "sprinklr", "autodesk", "motorola", "samsung", "amd", "broadcom", "arm",
+    "netapp", "fortinet", "crowdstrike", "splunk", "dynatrace", "cadence",
+    "synopsys", "applied materials", "bosch", "honeywell", "siemens",
+    "american express", "amex", "barclays", "hsbc", "standard chartered",
+    "wells fargo", "bank of america", "capital one", "blackrock", "bloomberg",
+    "experian", "philips", "delhivery", "dream11", "dream sports", "makemytrip",
+    "pine labs", "urban company", "zepto", "juspay", "chargebee", "cohesity",
+    "natwest", "transunion", "cursor", "harvey",
 }
 
 KNOWN = {
@@ -71,6 +82,12 @@ KNOWN = {
     "cockroach labs", "scale ai", "crunchyroll", "agoda", "adyen", "quince",
     "tripadvisor", "lyft", "sofi", "ripple", "khan academy", "deutsche bank",
     "bnp paribas", "nielseniq", "wex", "gojek", "shadowfax", "capillary",
+    "launchdarkly", "grafana", "smartsheet", "commvault", "monzo", "toast",
+    "nykaa", "policybazaar", "policy bazaar", "bharatpe", "acko", "gupshup",
+    "sharechat", "clevertap", "hasura", "miro", "pagerduty", "redis", "neo4j",
+    "schneider electric", "western digital", "seagate", "marvell",
+    "analog devices", "oyo", "sentinelone", "grab",
+    "sauce labs", "n-able", "media.net", "motive",
 }
 
 # Names that mark an employer as an intermediary rather than the employer.
@@ -86,13 +103,17 @@ EXCLUDED_MARKERS = (
     "ntt data", "birlasoft", "coforge", "hexaware", "persistent systems",
     "cgi", "dxc", "atos", "virtusa", "syntel", "iGate", "quess", "randstad",
     "adecco", "teamlease", "huntingcube", "crescendo", "antal", "michael page",
+    "exl", "ust", "capco", "wsp",
 )
 # Legal-entity boilerplate that body shops happen to use, and so do the Indian
 # subsidiaries of the companies we want: "Goldman Sachs Services Pvt Ltd",
 # "Swiggy - Bundl Technologies Pvt Ltd", "Amazon Hiring". These exclude only a
-# name that matched no tier.
+# name that matched no tier. "private limited" is the same boilerplate as
+# "pvt ltd"; LinkedIn spells it out for shops and uses the brand for the rest.
 GENERIC_EXCLUDED_MARKERS = ("hiring", "services pvt", "technologies pvt ltd",
-                            "solutions pvt", "infotech")
+                            "solutions pvt", "infotech", "private limited", "pvt",
+                            "solutions", "infoweb", "web applications",
+                            "information technologies")
 
 # Tier names that are also ordinary words ("Square Yards", "Notion Press",
 # "Target"), accepted only as the whole name — after legal suffixes are
@@ -101,6 +122,7 @@ AMBIGUOUS_NAMES = {
     "square", "block", "notion", "elastic", "discord", "plaid", "target",
     "booking", "visa", "millennium", "turing", "chime", "harness", "ripple",
     "affirm", "sigmoid", "amplitude", "cred",
+    "arm", "toast", "miro", "grab", "motive", "harvey",
 }
 
 _SUFFIX_RE = re.compile(
@@ -132,7 +154,44 @@ def _prep(names: Iterable[str]) -> List[str]:
     return sorted({_norm(n) for n in names if _norm(n)})
 
 
+# Employers with a public record of sponsoring a Skilled Worker visa (UK),
+# a Critical Skills permit (Ireland), an EU Blue Card (Germany), or a highly
+# skilled migrant permit (Netherlands) for engineers. Not the government
+# register — the names international candidates actually get sponsored by.
+# Amazon is on it, and is also capped, because one employer was the whole list.
+EUROPE_VISA_SPONSORS = (
+    # Search walks this order and stops after a fixed number of requests,
+    # so the names international candidates actually get sponsored by come first.
+    "google", "deepmind", "meta", "apple", "microsoft", "stripe", "spotify",
+    "revolut", "wise", "bloomberg", "arm", "booking", "adyen", "zalando",
+    "sap", "asml", "helsing", "databricks", "palantir", "uber", "nvidia",
+    "monzo", "celonis", "personio", "n26", "philips", "mollie", "tomtom",
+    "amazon", "netflix",
+    "jane street", "optiver", "citadel", "goldman sachs", "jpmorgan",
+    "j.p. morgan", "morgan stanley", "de shaw", "two sigma", "imc", "flow traders",
+    "ibm", "intel", "qualcomm", "oracle", "cisco", "salesforce", "adobe",
+    "atlassian", "hubspot", "workday", "intercom", "tiktok",
+    "cloudflare", "datadog", "snowflake", "mongodb", "elastic", "gitlab",
+    "twilio", "reddit", "coinbase", "openai", "anthropic", "linkedin",
+)
+EUROPE_JOBS_PER_COMPANY = 8
+
+# What the India LinkedIn search asks for by name. One query each, so this
+# list is the request budget. A card from these queries is kept only when the
+# company is already on a tier. An unknown employer reaches the board from the
+# broad search, and only when the title is a software role.
+INDIA_COMPANY_SEARCH = (
+    "Google", "Microsoft", "Amazon", "Apple", "NVIDIA", "Meta",
+    "Adobe", "Salesforce", "Atlassian", "Uber", "Intuit", "ServiceNow",
+    "Oracle", "SAP", "Cisco", "Intel", "Qualcomm", "Databricks",
+    "Flipkart", "Swiggy", "Zomato", "Razorpay", "PhonePe", "Walmart",
+    "Goldman Sachs", "JPMorgan", "Morgan Stanley", "Freshworks", "Zoho",
+    "Postman", "CRED", "Meesho", "Groww", "Dream11", "MakeMyTrip",
+    "Visa", "PayPal", "Deutsche Bank", "Barclays", "Samsung",
+)
+
 _FAANG, _ELITE, _STRONG, _KNOWN = (_prep(s) for s in (FAANG, ELITE, STRONG, KNOWN))
+_EUROPE_SPONSORS = _prep(EUROPE_VISA_SPONSORS)
 _AMBIGUOUS = set(_prep(AMBIGUOUS_NAMES))
 _EXCLUDED_STEMS = tuple(_clean(m) for m in EXCLUDED_STEMS)
 _EXCLUDED_MARKERS = tuple(_clean(m) for m in EXCLUDED_MARKERS)
@@ -151,6 +210,28 @@ def _in_set(name: str, names: Iterable[str]) -> bool:
         if _has_word(clean, candidate):
             return True
     return False
+
+
+def sponsors_europe_visa(company: str) -> bool:
+    """True when this employer is known to sponsor a work visa in the UK or EU."""
+    return bool(company) and _in_set(company, _EUROPE_SPONSORS)
+
+
+def cap_jobs_per_company(jobs, limit: int = EUROPE_JOBS_PER_COMPANY):
+    """Keep the highest-scored rows. The list must already be score-descending."""
+    counts: Dict[str, int] = {}
+    kept = []
+    for job in jobs:
+        if isinstance(job, dict):
+            name = job.get("company") or ""
+        else:
+            name = getattr(job, "company", "") or ""
+        key = _norm(name) or name.lower()
+        if counts.get(key, 0) >= limit:
+            continue
+        counts[key] = counts.get(key, 0) + 1
+        kept.append(job)
+    return kept
 
 
 def company_tier(company: str) -> Tier:

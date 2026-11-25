@@ -94,7 +94,7 @@ def escape(text: str) -> str:
 # Injected just before \begin{document}. Handles the frozen parts of the
 # document, which `escape()` never sees.
 HARDENING = r"""
-%% --- ATS hardening (injected by TempoApply) ---------------------------------
+%% --- ATS hardening (injected by Quill) ---------------------------------
 %% Suppress OpenType ligatures so extracted text stays plain ASCII, and stop
 %% hyphenation splitting a keyword across two lines.
 \usepackage{fontspec}
@@ -114,7 +114,7 @@ HARDENING = r"""
 # compile at all. Declaring no-op equivalents lets the author's file build
 # unchanged — XeTeX writes its own ToUnicode map, so nothing is lost.
 ENGINE_COMPAT = r"""
-%% --- engine compatibility (injected by TempoApply) --------------------------
+%% --- engine compatibility (injected by Quill) --------------------------
 \makeatletter
 \ifdefined\pdfglyphtounicode\else\def\pdfglyphtounicode#1#2{}\fi
 \ifdefined\pdfgentounicode\else\newcount\pdfgentounicode\fi
@@ -129,7 +129,7 @@ _DOCUMENTCLASS_RE = re.compile(r"\\documentclass\s*(\[[^\]]*\])?\s*\{[^{}]*\}")
 
 def engine_compat(source: str) -> str:
     """Make a pdfLaTeX-targeted preamble survive XeTeX. Idempotent."""
-    if "engine compatibility (injected by TempoApply)" in source:
+    if "engine compatibility (injected by Quill)" in source:
         return source
     m = _DOCUMENTCLASS_RE.search(source)
     if not m:
@@ -148,7 +148,7 @@ def harden(source: str) -> str:
     Idempotent, so it is safe to call on every recompile of the trim loop.
     """
     source = engine_compat(source)
-    if "ATS hardening (injected by TempoApply)" in source:
+    if "ATS hardening (injected by Quill)" in source:
         return source
     marker = r"\begin{document}"
     if marker not in source:
@@ -242,7 +242,7 @@ class TexDoc:
     slots: List[Slot] = field(default_factory=list)
     skills: List[SkillLine] = field(default_factory=list)
     # Summary openings the author has written as true of themselves, from a
-    # `% tempoapply-headlines: A | B | C` comment. The first is the one in use.
+    # `% Quill-headlines: A | B | C` comment. The first is the one in use.
     headlines: List[str] = field(default_factory=list)
 
     def slot(self, slot_id: str) -> Optional[Slot]:
@@ -601,7 +601,7 @@ def parse(source: str) -> TexDoc:
     )
 
 
-_HEADLINES_RE = re.compile(r"(?m)^[ \t]*%[ \t]*tempoapply-headlines:[ \t]*(.+)$")
+_HEADLINES_RE = re.compile(r"(?m)^[ \t]*%[ \t]*Quill-headlines:[ \t]*(.+)$")
 _SKILL_LABEL_RE = re.compile(r"(?m)^[ \t]*\\textbf\s*\{")
 _LINE_BREAK_RE = re.compile(r"\\\\|\n")
 

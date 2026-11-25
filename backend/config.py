@@ -49,6 +49,8 @@ class Settings(BaseSettings):
     target_roles: str = "Software Engineer,Backend Engineer"
     experience_years: int = 2
     preferred_locations: str = "Bengaluru,Remote"
+    # india | europe. Europe is UK, Ireland, Germany, the Netherlands, and Sweden.
+    target_region: str = "india"
     min_relevance_score: int = 55
     excluded_companies: str = ""
 
@@ -73,7 +75,7 @@ class Settings(BaseSettings):
 
     # App
     base_resume_path: str = "resumes/base_resume.tex"
-    database_url: str = "sqlite:///./tempoapply.db"
+    database_url: str = "sqlite:///./Quill.db"
     # Localhost only. 0.0.0.0 served the profile, the resume and every
     # write endpoint to anything on the same Wi-Fi, with no login.
     api_host: str = "127.0.0.1"
@@ -100,6 +102,11 @@ class Settings(BaseSettings):
         if not self.excluded_companies:
             return []
         return [c.strip() for c in self.excluded_companies.split(",")]
+
+    @property
+    def active_region(self) -> str:
+        region = (self.target_region or "").strip().lower()
+        return region if region in {"india", "europe"} else "india"
 
 
 settings = Settings()

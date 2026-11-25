@@ -1,12 +1,11 @@
 """
-TempoApply -- Main entrypoint.
+Quill -- Main entrypoint.
 Starts the FastAPI backend server.
 """
 import uvicorn
 import sys
 import os
 
-# Ensure the project root is in Python path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import asyncio
@@ -18,7 +17,7 @@ from backend.config import settings
 
 if __name__ == "__main__":
     print("=" * 50)
-    print("  TempoApply — Entry-Level Job Search Engine (<2 Yrs Exp)")
+    print("  Quill — Entry-Level Job Search Engine (<2 Yrs Exp)")
     print("=" * 50)
     print(f"  API Server : http://{settings.api_host}:{settings.api_port}")
     print(f"  Target Roles: {', '.join(settings.target_roles_list)}")

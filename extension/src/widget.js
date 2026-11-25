@@ -196,7 +196,7 @@
     if (host && !host.isConnected) teardown();
     if (host) return;
     host = document.createElement("div");
-    host.id = "tempoapply-widget-host";
+    host.id = "Quill-widget-host";
     host.style.cssText = "all: initial; position: static;";
     root = host.attachShadow({ mode: "open" });
     const style = document.createElement("style");

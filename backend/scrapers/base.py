@@ -51,7 +51,7 @@ async def create_browser_context(playwright, headless: bool = True, storage_stat
             logger.debug(f"Chromium launch channel={channel}: {exc}")
     if context is None:
         raise RuntimeError(
-            "Could not launch Chrome. Close any leftover TempoApply Chrome window "
+            "Could not launch Chrome. Close any leftover Quill Chrome window "
             f"and retry. ({last_exc})"
         )
     await context.add_init_script(STEALTH_JS)

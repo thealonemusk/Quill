@@ -9,9 +9,11 @@ import asyncio
 import re
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional
+from urllib.parse import urlparse
 from loguru import logger
 import requests
 
+from backend.job_freshness import CAREER_FRESHNESS_HOURS
 from backend.scrapers import http
 from bs4 import BeautifulSoup
 
@@ -29,8 +31,6 @@ from backend.scan_control import should_stop
 HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
 }
-
-from backend.job_freshness import CAREER_FRESHNESS_HOURS
 
 # Extra title aliases beyond the pipeline role strings (SDE, fullstack, etc.)
 ROLE_ALIASES = [
@@ -50,9 +50,6 @@ ROLE_ALIASES = [
     "golang developer",
     "go developer",
     "platform engineer",
-    "devops engineer",
-    "sre",
-    "site reliability",
     "sde",
     "new grad",
     "university graduate",
@@ -149,7 +146,6 @@ def _role_matches(title: str, roles: List[str]) -> bool:
     if INTERN_PATTERN.search(title):
         return False
 
-    # Reject if title contains excluded senior/lead/manager keywords
     for keyword in EXCLUDED_TITLE_KEYWORDS:
         if keyword in title_lower:
             return False
@@ -209,7 +205,6 @@ def _scrape_greenhouse(company: dict, roles: List[str]) -> List[dict]:
                 continue
 
             job_url = job.get("absolute_url", "")
-            # Extract JD from content block
             content = job.get("content", "")
             if content:
                 soup = BeautifulSoup(content, "html.parser")
@@ -236,6 +231,47 @@ def _scrape_greenhouse(company: dict, roles: List[str]) -> List[dict]:
     except Exception as e:
         logger.warning(f"Greenhouse {name}: {e}")
 
+    return results
+
+
+def _scrape_ashby(company: dict, roles: List[str]) -> List[dict]:
+    """Public Ashby board: https://api.ashbyhq.com/posting-api/job-board/{slug}."""
+    api_id = company["api_id"]
+    name = company["name"]
+    loc_filter = company.get("location_filter", [])
+    results = []
+    url = f"https://api.ashbyhq.com/posting-api/job-board/{api_id}"
+    try:
+        resp = http.get(url, headers=HEADERS, timeout=15)
+        if resp.status_code != 200:
+            logger.warning(f"Ashby {name}: HTTP {resp.status_code} (bad api_id={api_id}?)")
+            return []
+        jobs = resp.json().get("jobs") or []
+        logger.info(f"Ashby {name} ({api_id}): {len(jobs)} total postings")
+        for job in jobs:
+            title = job.get("title", "")
+            if not _role_matches(title, roles):
+                continue
+            location = job.get("location") or ""
+            if not _location_matches(location, loc_filter):
+                continue
+            if not _is_fresh(timestamp_str=job.get("publishedAt") or ""):
+                continue
+            jd_text = job.get("descriptionPlain") or ""
+            if not jd_text and job.get("descriptionHtml"):
+                jd_text = BeautifulSoup(job["descriptionHtml"], "html.parser").get_text(separator="\n").strip()
+            results.append(normalize_job({
+                "title": title,
+                "company": name,
+                "location": location,
+                "url": job.get("jobUrl") or "",
+                "jd_text": jd_text,
+                "easy_apply": True,
+                "ats_type": "ashby",
+            }, "company_careers"))
+        results = [job for job in results if _passes_career_filters(job)]
+    except Exception as e:
+        logger.warning(f"Ashby {name}: {e}")
     return results
 
 
@@ -282,7 +318,6 @@ def _scrape_lever(company: dict, roles: List[str]) -> List[dict]:
 
             job_url = job.get("hostedUrl", "")
 
-            # Build JD from description + lists
             jd_parts = []
             desc_html = job.get("descriptionPlain") or job.get("description", "")
             if desc_html:
@@ -512,7 +547,6 @@ def _scrape_custom(company: dict, roles: List[str]) -> List[dict]:
             return []
 
         soup = BeautifulSoup(resp.content, "html.parser")
-        # Find all anchor tags that look like job listings
         anchors = soup.find_all("a", href=True)
 
         seen_urls: set = set()
@@ -523,11 +557,9 @@ def _scrape_custom(company: dict, roles: List[str]) -> List[dict]:
             if not text or not _role_matches(text, roles):
                 continue
 
-            # Build absolute URL
             if href.startswith("http"):
                 full_url = href
             elif href.startswith("/"):
-                from urllib.parse import urlparse
                 parsed = urlparse(careers_url)
                 full_url = f"{parsed.scheme}://{parsed.netloc}{href}"
             else:
@@ -537,7 +569,6 @@ def _scrape_custom(company: dict, roles: List[str]) -> List[dict]:
                 continue
             seen_urls.add(full_url)
 
-            # Best-effort location: look for data attribute or nearby text
             location_text = ""
             parent = a.parent
             if parent:
@@ -592,24 +623,23 @@ async def scrape_company_career_jobs(
     max_jobs: int = 500,
     companies: List[dict] = None,
 ) -> List[dict]:
-    """
-    Scrape company career sites for matching jobs posted in the last 72 hours.
-
-    Args:
-        roles: List of target role strings (e.g. ['Software Engineer', 'Backend Engineer'])
-        max_jobs: Max total jobs to return
-        companies: Override company list (defaults to TOP_COMPANIES)
-
-    Returns:
-        List of normalized job dicts with platform='company_careers'
-    """
+    """Career-site jobs from the last 72 hours. `companies` overrides TOP_COMPANIES."""
     if roles is None:
         from backend.config import settings
         from backend.scrapers.registry import resolve_discovery_roles
         roles = resolve_discovery_roles(settings.target_roles_list)
 
     search_roles = _expanded_search_roles(roles)
-    company_list = companies or TOP_COMPANIES
+    # Famous boards first. A stopped scan should have spent its time on them,
+    # not on the long tail of boards that never match.
+    from backend.autopilot.select import Tier, company_tier
+
+    company_list = sorted(
+        companies or TOP_COMPANIES,
+        key=lambda company: int(company_tier(company.get("name") or "")),
+        reverse=True,
+    )
+
     all_jobs: List[dict] = []
 
     # Dispatch each company scraper in a thread to avoid blocking the event loop
@@ -618,11 +648,18 @@ async def scrape_company_career_jobs(
         name = company.get("name", "?")
         if ctype == "skip":
             return []
+        # Accenture's Workday board answered every role search, and the filter
+        # then dropped each hit. An excluded name never belongs on the board.
+        if company_tier(name) is Tier.EXCLUDED:
+            logger.info(f"Career site skipped {name}: excluded company")
+            return []
         try:
             if ctype == "greenhouse":
                 return await asyncio.to_thread(_scrape_greenhouse, company, search_roles)
             elif ctype == "lever":
                 return await asyncio.to_thread(_scrape_lever, company, search_roles)
+            elif ctype == "ashby":
+                return await asyncio.to_thread(_scrape_ashby, company, search_roles)
             elif ctype == "workday":
                 return await asyncio.to_thread(_scrape_workday, company, search_roles)
             elif ctype == "custom":
@@ -634,8 +671,8 @@ async def scrape_company_career_jobs(
             logger.warning(f"Error scraping {name}: {e}")
             return []
 
-    # Run all companies concurrently (with a semaphore to avoid hammering servers)
-    semaphore = asyncio.Semaphore(12)  # max 12 concurrent requests
+    # Cap concurrency so a full board list does not hit every host at once.
+    semaphore = asyncio.Semaphore(12)
 
     async def rate_limited_scrape(company: dict) -> List[dict]:
         if should_stop():
@@ -661,7 +698,6 @@ async def scrape_company_career_jobs(
         f"{len([c for c in company_list if c.get('type') != 'skip'])} companies"
     )
 
-    # Deduplicate by URL, enforce max
     seen: set = set()
     deduped: List[dict] = []
     for job in all_jobs:

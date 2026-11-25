@@ -4,6 +4,7 @@ import clsx from 'clsx';
 import { motion } from 'framer-motion';
 import { Check, ExternalLink, Send } from 'lucide-react';
 import { Job } from '@/lib/types';
+import { TIER_STYLE, type Tier } from '@/lib/autopilot';
 import { ApplyStatusBadge, AtsBadge, PlatformBadge, ScoreBadge, VisitedBadge } from '@/components/ui/Badge';
 import { safeHref } from '@/lib/safe-url';
 
@@ -15,6 +16,19 @@ interface JobRowProps {
   onVisit: (id: string) => void;
   onApply: (id: string) => void;
   alwaysShowOpen?: boolean;
+}
+
+function Fame({ tier }: { tier?: string }) {
+  if (!tier || tier === 'UNKNOWN' || !(tier in TIER_STYLE)) return null;
+  const style = TIER_STYLE[tier as Tier];
+  return (
+    <span
+      className="shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none"
+      style={{ color: style.color, background: style.bg }}
+    >
+      {style.label}
+    </span>
+  );
 }
 
 /**
@@ -71,7 +85,10 @@ export function JobCard({
           >
             {job.title}
           </p>
-          <p className="mt-1 truncate text-[13px] text-[var(--text-secondary)]">{job.company}</p>
+          <p className="mt-1 flex min-w-0 items-center gap-1.5 truncate text-[13px] text-[var(--text-secondary)]">
+            <span className="truncate">{job.company}</span>
+            <Fame tier={job.tier} />
+          </p>
           {job.location && (
             <p className="truncate text-xs text-[var(--text-muted)]">{job.location}</p>
           )}
@@ -185,9 +202,12 @@ export function JobRow({
             {visited && <VisitedBadge />}
             <ApplyStatusBadge status={applying ? 'applying' : job.apply_status} />
           </div>
-          <p className="truncate text-xs text-[var(--text-muted)]">
-            {job.company}
-            {job.location ? ` · ${job.location}` : ''}
+          <p className="flex min-w-0 items-center gap-1.5 truncate text-xs text-[var(--text-muted)]">
+            <span className="truncate">
+              {job.company}
+              {job.location ? ` · ${job.location}` : ''}
+            </span>
+            <Fame tier={job.tier} />
           </p>
           {job.apply_error && job.apply_status && job.apply_status !== 'applied' && (
             <p className="mt-0.5 max-w-md truncate text-[11px] text-[var(--danger)]" title={job.apply_error}>

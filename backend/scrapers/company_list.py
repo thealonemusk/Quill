@@ -367,14 +367,16 @@ TOP_COMPANIES = [
     },
     {
         "name": "LinkedIn",
-        "type": "greenhouse",
+        "type": "skip",
         "api_id": "linkedin",
+        "reason": "Greenhouse board 404; LinkedIn stays manual",
         "location_filter": INDIA_LOCS,
     },
     {
         "name": "Amplitude",
-        "type": "greenhouse",
+        "type": "skip",
         "api_id": "amplitude",
+        "reason": "Greenhouse board 404",
         "location_filter": INDIA_LOCS,
     },
     {
@@ -498,6 +500,32 @@ TOP_COMPANIES = [
         "location_filter": INDIA_LOCS,
     },
 
+    # ──────────────────── Ashby (verified 2026-10-11) ─────────────────────
+    {
+        "name": "Notion",
+        "type": "ashby",
+        "api_id": "notion",
+        "location_filter": INDIA_LOCS,
+    },
+    {
+        "name": "OpenAI",
+        "type": "ashby",
+        "api_id": "openai",
+        "location_filter": INDIA_LOCS,
+    },
+    {
+        "name": "Harvey",
+        "type": "ashby",
+        "api_id": "harvey",
+        "location_filter": INDIA_LOCS,
+    },
+    {
+        "name": "Cursor",
+        "type": "ashby",
+        "api_id": "cursor",
+        "location_filter": INDIA_LOCS,
+    },
+
     # ──────────────────── Lever ATS (verified) ─────────────────────
     {
         "name": "Spotify",
@@ -559,10 +587,11 @@ TOP_COMPANIES = [
     # ──────────────────── Workday ATS (verified) ─────────────────────
     {
         "name": "Accenture India",
-        "type": "workday",
+        "type": "skip",
         "tenant": "accenture",
         "api_id": "accenturecareers",
         "wd": "wd103",
+        "reason": "excluded company; a Workday sweep cannot reach the board",
         "location_filter": INDIA_LOCS,
     },
     {
@@ -642,6 +671,46 @@ TOP_COMPANIES = [
         "type": "workday",
         "tenant": "motorolasolutions",
         "api_id": "careers",
+        "wd": "wd5",
+        "location_filter": INDIA_LOCS,
+    },
+    {
+        "name": "Visa",
+        "type": "workday",
+        "tenant": "visa",
+        "api_id": "Visa",
+        "wd": "wd5",
+        "location_filter": INDIA_LOCS,
+    },
+    {
+        "name": "Mastercard",
+        "type": "workday",
+        "tenant": "mastercard",
+        "api_id": "CorporateCareers",
+        "wd": "wd1",
+        "location_filter": INDIA_LOCS,
+    },
+    {
+        "name": "Samsung",
+        "type": "workday",
+        "tenant": "sec",
+        "api_id": "Samsung_Careers",
+        "wd": "wd3",
+        "location_filter": INDIA_LOCS,
+    },
+    {
+        "name": "Applied Materials",
+        "type": "workday",
+        "tenant": "amat",
+        "api_id": "External",
+        "wd": "wd1",
+        "location_filter": INDIA_LOCS,
+    },
+    {
+        "name": "CrowdStrike",
+        "type": "workday",
+        "tenant": "crowdstrike",
+        "api_id": "crowdstrikecareers",
         "wd": "wd5",
         "location_filter": INDIA_LOCS,
     },

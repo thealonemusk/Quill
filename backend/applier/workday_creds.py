@@ -18,7 +18,7 @@ that cannot succeed.
 Storage is a gitignored JSON file next to the other config. That matches how
 this project already keeps LinkedIn and Naukri passwords in `config/.env` —
 plaintext, local, never committed. It is not secret management; if you want
-that, point `TEMPOAPPLY_WORKDAY_ACCOUNTS` at a file on an encrypted volume.
+that, point `Quill_WORKDAY_ACCOUNTS` at a file on an encrypted volume.
 """
 from __future__ import annotations
 
@@ -45,7 +45,7 @@ _HOST_RE = re.compile(r"^(?P<tenant>[a-z0-9-]+)\.(?P<dc>wd\d+)\.myworkday(?:jobs
 
 
 def store_path() -> Path:
-    override = os.environ.get("TEMPOAPPLY_WORKDAY_ACCOUNTS", "").strip()
+    override = os.environ.get("Quill_WORKDAY_ACCOUNTS", "").strip()
     return Path(override) if override else DEFAULT_STORE
 
 

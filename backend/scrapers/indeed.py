@@ -3,7 +3,7 @@ Indeed Job Scraper — searches and scrapes jobs from Indeed India.
 Handles public job search and JD extraction using BeautifulSoup to avoid Playwright subprocess issues.
 """
 import asyncio
-from typing import List, Optional
+from typing import List
 from loguru import logger
 import requests
 
@@ -101,8 +101,7 @@ async def scrape_indeed_jobs(
                         
                         if not title or not card.get('jobkey'):
                             continue
-                            
-                        # Get JD
+
                         detail = await asyncio.to_thread(_scrape_job_detail_bs4, url)
                         
                         raw = {

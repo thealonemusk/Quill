@@ -219,6 +219,16 @@ def _migrate_db():
             if send_cols and name not in send_cols:
                 conn.execute(text(f"ALTER TABLE resume_sends ADD COLUMN {name} {ddl}"))
                 conn.commit()
+        # The jobs list filters and sorts on these. create_all does not add
+        # an index to a table that already exists.
+        for stmt in (
+            "CREATE INDEX IF NOT EXISTS ix_jobs_status ON jobs (status)",
+            "CREATE INDEX IF NOT EXISTS ix_jobs_platform ON jobs (platform)",
+            "CREATE INDEX IF NOT EXISTS ix_jobs_discovered_at ON jobs (discovered_at)",
+            "CREATE INDEX IF NOT EXISTS ix_jobs_score ON jobs (relevance_score)",
+        ):
+            conn.execute(text(stmt))
+        conn.commit()
     _release_cleared_jobs()
 
 

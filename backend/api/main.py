@@ -1,5 +1,5 @@
 """
-FastAPI REST API for TempoApply dashboard.
+FastAPI REST API for Quill dashboard.
 """
 import asyncio
 import re
@@ -13,7 +13,8 @@ if sys.platform == "win32":
 
 from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks, Query, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, model_validator
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from loguru import logger
 
@@ -23,9 +24,11 @@ from backend import seen_ledger
 from backend.config import settings
 from backend.platforms import DEFAULT_SCAN_PLATFORMS, SCAN_PLATFORMS, ALL_PLATFORMS
 from backend.applier.ats import detect_ats
+from backend.autopilot.select import cap_jobs_per_company, company_tier
 from backend.applier.profile import RESUMES_DIR, load_profile, save_profile
 from backend.api.autofill import router as autofill_router
 from backend.api.autopilot import router as autopilot_router
+from backend.scrapers.filter_utils import job_in_region
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 
@@ -36,7 +39,7 @@ def _env_path() -> Path:
         path = PROJECT_ROOT / ".env"
     return path
 
-app = FastAPI(title="TempoApply API", version="1.0.0")
+app = FastAPI(title="Quill API", version="1.0.0")
 
 DASHBOARD_ORIGINS = ["http://localhost:3000", "http://127.0.0.1:3000"]
 
@@ -87,12 +90,12 @@ async def local_only(request, call_next):
 
     host = (request.url.hostname or "").lower()
     if host not in _LOCAL_HOSTS:
-        return JSONResponse({"detail": "TempoApply only answers on localhost"}, status_code=403)
+        return JSONResponse({"detail": "Quill only answers on localhost"}, status_code=403)
     origin = request.headers.get("origin")
     if request.method not in _SAFE_METHODS and origin:
         allowed = origin in DASHBOARD_ORIGINS or _EXTENSION_ORIGIN.match(origin)
         if not allowed:
-            return JSONResponse({"detail": f"Origin {origin} may not change TempoApply"}, status_code=403)
+            return JSONResponse({"detail": f"Origin {origin} may not change Quill"}, status_code=403)
     return await call_next(request)
 
 app.include_router(autofill_router)
@@ -102,7 +105,7 @@ app.include_router(autopilot_router)
 @app.on_event("startup")
 async def startup():
     init_db()
-    logger.info("🚀 TempoApply API started")
+    logger.info("Quill API started")
 
 
 # ─── Pydantic Schemas ────────────────────────────────────────────────────────
@@ -131,6 +134,8 @@ class JobOut(BaseModel):
     discovered_at: Optional[datetime]
     visited_at: Optional[datetime]
     applied_at: Optional[datetime]
+    tier: str = "UNKNOWN"
+    tier_value: int = 0
 
     class Config:
         from_attributes = True
@@ -139,6 +144,13 @@ class JobOut(BaseModel):
     @classmethod
     def blank_apply_fields(cls, value):
         return value or ""
+
+    @model_validator(mode="after")
+    def attach_tier(self):
+        tier = company_tier(self.company)
+        self.tier = tier.name
+        self.tier_value = int(tier)
+        return self
 
 
 class ScanRequest(BaseModel):
@@ -154,7 +166,7 @@ class StatusUpdate(BaseModel):
 
 class ApplyRequest(BaseModel):
     job_ids: Optional[List[str]] = None
-    auto_submit: bool = False  # ignored: TempoApply never submits
+    auto_submit: bool = False  # ignored: Quill never submits
     headless: bool = False
 
 
@@ -213,7 +225,15 @@ def get_jobs(
             dirty = True
     if dirty:
         db.commit()
-    return jobs
+    from backend.pipeline import collapse_linkedin_reposts
+
+    visible = [job for job in jobs if job_in_region(job, settings.active_region)]
+    visible = collapse_linkedin_reposts(visible)
+    if settings.active_region == "europe":
+        # Amazon alone was most of the Europe list. Eight per employer
+        # leaves room for the other sponsors.
+        visible = cap_jobs_per_company(visible)
+    return visible
 
 
 @app.get("/api/jobs/{job_id}", response_model=JobOut)
@@ -327,12 +347,18 @@ def clear_discovered_jobs(
     `include_applied` also removes rows already applied to. The application
     itself stays recorded in the seen ledger, which is what stops the job
     being offered again, but the `jobs` row and its Application detail go.
+
+    Only the region selected on the dashboard. Clearing India leaves the
+    UK / Ireland / Germany / Netherlands / Sweden rows, and the reverse.
     """
     statuses = list(CLEARABLE_STATUSES)
     if include_applied:
         statuses.append("applied")
 
-    jobs_to_delete = db.query(Job).filter(Job.status.in_(statuses)).all()
+    jobs_to_delete = [
+        job for job in db.query(Job).filter(Job.status.in_(statuses)).all()
+        if job_in_region(job, settings.active_region)
+    ]
 
     # Only a row carrying no decision becomes "cleared". Applied, rejected,
     # ignored (dismissed) and opened (visited) rows keep that decision in the
@@ -388,13 +414,15 @@ def purge_stale_jobs(
 
 @app.post("/api/jobs/purge-experienced")
 def purge_experienced_jobs(db: Session = Depends(get_db)):
-    """Purge jobs that fail experience, frontend, or India-location filters."""
+    """Purge this region's jobs that fail experience, frontend, or location filters."""
     from backend.scrapers.filter_utils import is_career_listing_eligible, passes_hard_filters
 
     all_jobs = db.query(Job).all()
     purged_count = 0
     for job in all_jobs:
         if job.status in {"applied", "interviewing", "offer"}:
+            continue
+        if not job_in_region(job, settings.active_region):
             continue
         job_dict = {
             "title": job.title,
@@ -404,7 +432,9 @@ def purge_experienced_jobs(db: Session = Depends(get_db)):
             "jd_text": job.jd_text,
             "platform": job.platform,
         }
-        is_valid, _ = passes_hard_filters(job_dict, max_years=settings.experience_years)
+        is_valid, _ = passes_hard_filters(
+            job_dict, max_years=settings.experience_years, region=settings.active_region,
+        )
         if is_valid and job.platform == "company_careers":
             is_valid, _ = is_career_listing_eligible(job_dict)
         if not is_valid:
@@ -663,8 +693,11 @@ async def start_apply(
         cutoff = datetime.utcnow() - timedelta(hours=JOB_FRESHNESS_HOURS)
         job_ids = [
             j.id for j in eligible_jobs(db)
-            if j.status not in ("discovered", "scored")
-            or (j.discovered_at is not None and j.discovered_at >= cutoff)
+            if job_in_region(j, settings.active_region)
+            and (
+                j.status not in ("discovered", "scored")
+                or (j.discovered_at is not None and j.discovered_at >= cutoff)
+            )
         ]
         if not job_ids:
             raise HTTPException(status_code=400, detail="No eligible jobs to apply to")
@@ -709,14 +742,22 @@ async def apply_single_job(job_id: str, background_tasks: BackgroundTasks, db: S
 @app.get("/api/analytics")
 def get_analytics(db: Session = Depends(get_db)):
     """Return aggregated application stats."""
-    total = db.query(Job).count()
-    by_status = {}
-    for status in ["discovered", "scored", "tailored", "applied", "interviewing", "rejected", "offer"]:
-        by_status[status] = db.query(Job).filter(Job.status == status).count()
+    status_counts = dict(
+        db.query(Job.status, func.count(Job.id)).group_by(Job.status).all()
+    )
+    by_status = {
+        status: status_counts.get(status, 0)
+        for status in (
+            "discovered", "scored", "tailored", "applied",
+            "interviewing", "rejected", "offer",
+        )
+    }
+    total = sum(status_counts.values())
 
-    by_platform = {}
-    for platform in ALL_PLATFORMS:
-        by_platform[platform] = db.query(Job).filter(Job.platform == platform).count()
+    platform_counts = dict(
+        db.query(Job.platform, func.count(Job.id)).group_by(Job.platform).all()
+    )
+    by_platform = {platform: platform_counts.get(platform, 0) for platform in ALL_PLATFORMS}
 
     top_companies = (
         db.query(Job.company, Job.relevance_score)
@@ -735,12 +776,24 @@ def get_analytics(db: Session = Depends(get_db)):
 
 # ─── Settings ────────────────────────────────────────────────────────────────
 
+def _target_region(new_settings: dict) -> str:
+    """A save that omits the field keeps the current region."""
+    raw = new_settings.get("target_region")
+    if raw in (None, ""):
+        return settings.active_region
+    region = str(raw).strip().lower()
+    if region not in {"india", "europe"}:
+        raise HTTPException(status_code=400, detail="target_region must be india or europe")
+    return region
+
+
 @app.get("/api/settings")
 def get_settings():
     return {
         "target_roles": settings.target_roles_list,
         "experience_years": settings.experience_years,
         "preferred_locations": settings.preferred_locations_list,
+        "target_region": settings.active_region,
         "min_relevance_score": settings.min_relevance_score,
         "user_full_name": settings.user_full_name,
         "excluded_companies": settings.excluded_companies_list,
@@ -767,6 +820,7 @@ def update_settings(new_settings: dict):
         "TARGET_ROLES": ",".join(new_settings.get("target_roles", settings.target_roles_list)),
         "EXPERIENCE_YEARS": str(new_settings.get("experience_years", settings.experience_years)),
         "PREFERRED_LOCATIONS": ",".join(new_settings.get("preferred_locations", settings.preferred_locations_list)),
+        "TARGET_REGION": _target_region(new_settings),
         "MIN_RELEVANCE_SCORE": str(new_settings.get("min_relevance_score", settings.min_relevance_score)),
         "USER_FULL_NAME": new_settings.get("user_full_name", settings.user_full_name),
         "EXCLUDED_COMPANIES": ",".join(

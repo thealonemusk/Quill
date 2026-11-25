@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
+import { RegionTheme } from '@/components/RegionTheme';
 import { ThemeProvider } from '@/components/ThemeProvider';
 
 export const metadata: Metadata = {
@@ -24,7 +25,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     // differ by design on the first paint.
     <html lang="en" suppressHydrationWarning>
       <body className="min-h-screen antialiased">
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider>
+          <RegionTheme />
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );

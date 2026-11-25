@@ -1,5 +1,5 @@
 """
-TempoApply never submits — proved in a real browser, not asserted in a comment.
+Quill never submits — proved in a real browser, not asserted in a comment.
 
 Each page below records a submission in `window.__submitted` and cancels it,
 so a test can tell "the bot pressed Submit" from "the bot pressed something
