@@ -16,13 +16,17 @@ async function apiBase() {
 
 async function call(path, options) {
   const base = await apiBase();
+  const stored = await chrome.storage.local.get("apiToken");
+  const token = (stored.apiToken || "").trim();
+  const headers = { "Content-Type": "application/json", ...(options && options.headers) };
+  if (token) headers.Authorization = `Bearer ${token}`;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
     const response = await fetch(`${base}${path}`, {
       ...options,
       signal: controller.signal,
-      headers: { "Content-Type": "application/json", ...(options && options.headers) },
+      headers,
     });
     if (!response.ok) {
       let detail = `HTTP ${response.status}`;
@@ -182,11 +186,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return;
       }
 
-      case "setApiBase":
-        await chrome.storage.local.set({ apiBase: message.value });
+      case "setApiBase": {
+        const saved = { apiBase: message.value };
+        if (typeof message.token === "string") saved.apiToken = message.token.trim();
+        await chrome.storage.local.set(saved);
         resumeCache.clear();
         sendResponse({ ok: true });
         return;
+      }
 
       case "getApiBase":
         sendResponse({ ok: true, data: { apiBase: await apiBase() } });

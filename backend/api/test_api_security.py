@@ -12,6 +12,7 @@ Run:  python backend/api/test_api_security.py
 """
 from __future__ import annotations
 
+import os
 import sys
 import tempfile
 from pathlib import Path
@@ -69,6 +70,35 @@ def run() -> None:
     print("\nHost: DNS rebinding reaches 127.0.0.1 under a foreign name")
     check("GET /api/profile via localhost", local.get("/api/autofill/ping").status_code, 200)
     check("GET /api/profile via a rebound name is refused", rebound.get("/api/profile").status_code, 403)
+    render = TestClient(main.app, base_url="https://quill-ieny.onrender.com")
+    saved_token = os.environ.pop("API_TOKEN", None)
+    saved_setting = main.settings.api_token
+    main.settings.api_token = ""
+    try:
+        check("GET via the deployed Render host without a token is refused",
+              render.get("/api/autofill/ping").status_code, 401)
+        check("localhost still answers when the public token is unset",
+              local.get("/api/autofill/ping").status_code, 200)
+        os.environ["API_TOKEN"] = "quill-test-token"
+        check("localhost still answers when a public token is set",
+              local.get("/api/autofill/ping").status_code, 200)
+        check("the deployed host rejects a wrong token",
+              render.get("/api/autofill/ping", headers={"Authorization": "Bearer nope"}).status_code, 401)
+        auth = {"Authorization": "Bearer quill-test-token"}
+        check("the deployed host accepts the token",
+              render.get("/api/autofill/ping", headers=auth).status_code, 200)
+        check("API docs stay hidden on the deployed host",
+              render.get("/docs", headers=auth).status_code, 404)
+        check("OpenAPI stays hidden on the deployed host",
+              render.get("/openapi.json", headers=auth).status_code, 404)
+    finally:
+        if saved_token is None:
+            os.environ.pop("API_TOKEN", None)
+        else:
+            os.environ["API_TOKEN"] = saved_token
+        main.settings.api_token = saved_setting
+    other = TestClient(main.app, base_url="https://other.onrender.com")
+    check("GET via a different Render host is refused", other.get("/api/profile").status_code, 403)
 
     print("\nOrigin: CORS blocks reading, not sending")
     # An empty body to /api/jobs/manual fails validation (422) once past the
@@ -80,6 +110,29 @@ def run() -> None:
           local.post(probe, json={}, headers=evil).status_code, 403)
     check("POST from the dashboard reaches the handler",
           local.post(probe, json={}, headers={"Origin": "http://localhost:3000"}).status_code, 422)
+    os.environ["API_TOKEN"] = "quill-test-token"
+    check("POST from the deployed dashboard reaches the handler",
+          render.post(
+              probe,
+              json={},
+              headers={
+                  "Origin": "https://quill-nikhil.vercel.app",
+                  "Authorization": "Bearer quill-test-token",
+              },
+          ).status_code, 422)
+    check("POST from a foreign site to the deployed host is refused",
+          render.post(
+              probe,
+              json={},
+              headers={
+                  "Origin": "https://evil.example",
+                  "Authorization": "Bearer quill-test-token",
+              },
+          ).status_code, 403)
+    if saved_token is None:
+        os.environ.pop("API_TOKEN", None)
+    else:
+        os.environ["API_TOKEN"] = saved_token
     check("POST from an extension reaches the handler",
           local.post(probe, json={},
                      headers={"Origin": "chrome-extension://abcdefghijklmnopabcdefghijklmnop"}).status_code, 422)

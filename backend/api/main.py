@@ -2,8 +2,12 @@
 FastAPI REST API for Quill dashboard.
 """
 import asyncio
+import hashlib
+import hmac
+import os
 import re
 import sys
+import time
 from pathlib import Path
 from typing import List, Optional
 from datetime import datetime, timedelta
@@ -40,7 +44,11 @@ def _env_path() -> Path:
 
 app = FastAPI(title="Quill API", version="1.0.0")
 
-DASHBOARD_ORIGINS = ["http://localhost:3000", "http://127.0.0.1:3000"]
+DASHBOARD_ORIGINS = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "https://quill-nikhil.vercel.app",
+]
 
 
 def _extension_origin_re() -> str:
@@ -66,7 +74,78 @@ app.add_middleware(
 )
 
 _LOCAL_HOSTS = {"localhost", "127.0.0.1", "[::1]", "::1"}
+_PUBLIC_HOSTS = {"quill-ieny.onrender.com"}
+_ALLOWED_HOSTS = _LOCAL_HOSTS | _PUBLIC_HOSTS
 _SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
+_HIDDEN_ON_PUBLIC = {"/docs", "/redoc", "/openapi.json"}
+_MAX_RESUME_BYTES = 5 * 1024 * 1024
+_RATE_LIMIT = 180
+_RATE_WINDOW = 60.0
+_HITS: dict[str, list[float]] = {}
+
+
+def _expected_token() -> str:
+    # The host environment wins so a test, and Render, can set it without
+    # restarting the settings object.
+    env = (os.environ.get("API_TOKEN") or "").strip()
+    if env:
+        return env
+    return (getattr(settings, "api_token", "") or "").strip()
+
+
+def _token_ok(request) -> bool:
+    expected = _expected_token()
+    if not expected:
+        return False
+    header = request.headers.get("authorization") or ""
+    if header.lower().startswith("bearer "):
+        got = header[7:].strip()
+    else:
+        got = (request.headers.get("x-api-token") or "").strip()
+    if not got:
+        return False
+    # Hash both sides so a length mismatch cannot throw or leak the length.
+    return hmac.compare_digest(
+        hashlib.sha256(got.encode()).digest(),
+        hashlib.sha256(expected.encode()).digest(),
+    )
+
+
+def _too_many(request, authed: bool) -> bool:
+    # Failures are counted per address. A valid token has its own budget, so a
+    # stranger rotating addresses cannot lock the real client out.
+    if authed:
+        got = (request.headers.get("authorization") or request.headers.get("x-api-token") or "")
+        key = "ok:" + hashlib.sha256(got.encode()).hexdigest()[:16]
+        limit = _RATE_LIMIT
+    else:
+        forwarded = request.headers.get("x-forwarded-for") or ""
+        ip = forwarded.split(",")[0].strip()
+        if not ip and request.client is not None:
+            ip = request.client.host or ""
+        key = "no:" + (ip or "unknown")
+        limit = 30
+    now = time.monotonic()
+    hits = [stamp for stamp in _HITS.get(key, []) if now - stamp < _RATE_WINDOW]
+    if len(hits) >= limit:
+        _HITS[key] = hits
+        return True
+    hits.append(now)
+    _HITS[key] = hits
+    if len(_HITS) > 2000:
+        _HITS.clear()
+    return False
+
+
+def _locked(detail: str, status: int):
+    from fastapi.responses import JSONResponse
+
+    response = JSONResponse({"detail": detail}, status_code=status)
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    return response
 
 
 @app.middleware("http")
@@ -76,7 +155,8 @@ async def local_only(request, call_next):
 
     Host: a page on the internet can rebind its own domain to 127.0.0.1 and
     then read this API as same-origin. Its requests still carry that domain in
-    the Host header, so anything but localhost is refused.
+    the Host header, so anything but localhost or the deployed Render host is
+    refused.
 
     Origin on writes: CORS stops a page *reading* a response, not *sending* the
     request. A "simple" POST (no-cors, no Content-Type) reaches the handler
@@ -85,17 +165,29 @@ async def local_only(request, call_next):
     cross-origin POST; one that is not the dashboard or the extension is
     refused. Scripts on this machine send none and are unaffected.
     """
-    from fastapi.responses import JSONResponse
-
     host = (request.url.hostname or "").lower()
-    if host not in _LOCAL_HOSTS:
-        return JSONResponse({"detail": "Quill only answers on localhost"}, status_code=403)
+    if host not in _ALLOWED_HOSTS:
+        return _locked("Quill only answers on localhost", 403)
+    if host in _PUBLIC_HOSTS:
+        authed = _token_ok(request)
+        if _too_many(request, authed):
+            return _locked("Too many requests", 429)
+        if not authed:
+            return _locked("Unauthorized", 401)
+        path = request.url.path
+        if path in _HIDDEN_ON_PUBLIC or path.startswith("/docs/"):
+            return _locked("Not found", 404)
     origin = request.headers.get("origin")
     if request.method not in _SAFE_METHODS and origin:
         allowed = origin in DASHBOARD_ORIGINS or _EXTENSION_ORIGIN.match(origin)
         if not allowed:
-            return JSONResponse({"detail": f"Origin {origin} may not change Quill"}, status_code=403)
-    return await call_next(request)
+            return _locked(f"Origin {origin} may not change Quill", 403)
+    response = await call_next(request)
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    return response
 
 app.include_router(autofill_router)
 
@@ -628,9 +720,19 @@ async def upload_resume_file(file: UploadFile = File(...)):
     suffix = Path(file.filename or "resume.pdf").suffix.lower()
     if suffix not in {".pdf", ".doc", ".docx"}:
         raise HTTPException(status_code=400, detail="Resume must be PDF, DOC, or DOCX")
+    chunks = []
+    size = 0
+    while True:
+        chunk = await file.read(65536)
+        if not chunk:
+            break
+        size += len(chunk)
+        if size > _MAX_RESUME_BYTES:
+            raise HTTPException(status_code=413, detail="Resume must be 5 MB or smaller")
+        chunks.append(chunk)
     RESUMES_DIR.mkdir(parents=True, exist_ok=True)
     dest = RESUMES_DIR / f"resume{suffix}"
-    dest.write_bytes(await file.read())
+    dest.write_bytes(b"".join(chunks))
     rel = f"resumes/resume{suffix}"
     save_profile({"resume_path": rel})
     return {"success": True, "resume_path": rel}

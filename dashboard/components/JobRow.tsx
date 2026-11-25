@@ -1,7 +1,6 @@
 'use client';
 
 import clsx from 'clsx';
-import { motion } from 'framer-motion';
 import { Check, ExternalLink, Send } from 'lucide-react';
 import { Job } from '@/lib/types';
 import { ApplyStatusBadge, AtsBadge, PlatformBadge, ScoreBadge, VisitedBadge } from '@/components/ui/Badge';
@@ -47,7 +46,6 @@ function Fame({ tier }: { tier?: string }) {
  */
 export function JobCard({
   job,
-  index = 0,
   applying = false,
   applyBusy = false,
   onVisit,
@@ -64,10 +62,7 @@ export function JobCard({
   const showError = job.apply_error && job.apply_status && job.apply_status !== 'applied';
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 6 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.02, duration: 0.2 }}
+    <div
       className={clsx(
         'rounded-2xl border bg-[var(--surface)] p-3.5 shadow-[var(--shadow-card)] transition-colors',
         visited
@@ -160,13 +155,12 @@ export function JobCard({
           </a>
         </div>
       </div>
-    </motion.div>
+    </div>
   );
 }
 
 export function JobRow({
   job,
-  index = 0,
   applying = false,
   applyBusy = false,
   onVisit,
@@ -183,10 +177,7 @@ export function JobRow({
     : '—';
 
   return (
-    <motion.tr
-      initial={{ opacity: 0, y: 6 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.02, duration: 0.2 }}
+    <tr
       className={clsx(
         'group border-b border-[var(--border)] transition-colors',
         visited
@@ -269,6 +260,6 @@ export function JobRow({
           </a>
         </div>
       </td>
-    </motion.tr>
+    </tr>
   );
 }

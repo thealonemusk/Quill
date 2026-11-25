@@ -21,6 +21,8 @@ function alertUser(text) {
 async function loadStatus() {
   const base = await send({ type: "getApiBase" });
   if (base.ok) $("api").value = base.data.apiBase;
+  const stored = await chrome.storage.local.get("apiToken");
+  $("token").value = stored.apiToken || "";
 
   const ping = await send({ type: "ping" });
   if (!ping.ok) {
@@ -69,7 +71,7 @@ $("show").addEventListener("click", async () => {
 
 $("save").addEventListener("click", async () => {
   const value = $("api").value.trim() || "http://localhost:8000";
-  await send({ type: "setApiBase", value });
+  await send({ type: "setApiBase", value, token: $("token").value.trim() });
   await loadStatus();
 });
 

@@ -1,10 +1,21 @@
 import type { Analytics, ApplicantProfile, ApplyStatus, Job, ScanStatus, SettingsData } from './types';
 import { DEFAULT_SCAN_PLATFORMS } from './platforms';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const VERCEL_HOST = 'quill-nikhil.vercel.app';
+
+export function apiBase(): string {
+  // The deployed page calls its own server, which attaches the token.
+  // A browser-visible URL would publish the secret in the page source.
+  if (typeof window !== 'undefined' && window.location.hostname === VERCEL_HOST) {
+    return '';
+  }
+  const configured = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '');
+  if (configured) return configured;
+  return 'http://localhost:8000';
+}
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, init);
+  const res = await fetch(`${apiBase()}${path}`, init);
   if (!res.ok) {
     let message = `API ${res.status}: ${path}`;
     try {
@@ -93,7 +104,7 @@ export const api = {
   uploadResume: async (file: File) => {
     const body = new FormData();
     body.append('file', file);
-    const res = await fetch(`${API_BASE}/api/profile/resume`, { method: 'POST', body });
+    const res = await fetch(`${apiBase()}/api/profile/resume`, { method: 'POST', body });
     if (!res.ok) throw new Error(`API ${res.status}: /api/profile/resume`);
     return res.json() as Promise<{ success: boolean; resume_path: string }>;
   },

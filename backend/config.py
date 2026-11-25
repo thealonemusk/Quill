@@ -79,6 +79,9 @@ class Settings(BaseSettings):
     # Localhost only. 0.0.0.0 served the profile, the resume and every
     # write endpoint to anything on the same Wi-Fi, with no login.
     api_host: str = "127.0.0.1"
+    # Required on the public host. Empty locally, so a laptop run needs no token.
+    # Set the same value on Render and on Vercel. Never a NEXT_PUBLIC_ variable.
+    api_token: str = ""
     # Pins the extension allowed to call the API (chrome://extensions shows
     # the 32-letter id). Blank accepts any extension origin.
     extension_id: str = ""

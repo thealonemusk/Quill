@@ -101,10 +101,22 @@ summary:focus-visible { outline: 2px solid var(--accent-ring); border-radius: 4p
   font: inherit;
   font-size: 11.5px;
 }
-.api input:focus {
+.api input:focus,
+.token:focus {
   outline: none;
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-ring);
+}
+.token {
+  width: 100%;
+  margin-top: 6px;
+  padding: 6px 9px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 11.5px;
 }
 
 footer {

@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect } from 'react';
+import { apiBase } from '@/lib/api';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
 const PING_EVERY_MS = 10 * 60 * 1000;
 const PING_LIMIT = 12;
 
@@ -12,11 +12,13 @@ function isRemoteApi(base: string): boolean {
 
 export function KeepAlive() {
   useEffect(() => {
-    if (!isRemoteApi(API_BASE)) return;
+    const base = apiBase();
+    const onDeployedSite = window.location.hostname === 'quill-nikhil.vercel.app';
+    if (!onDeployedSite && !isRemoteApi(base)) return;
     let sent = 0;
     const id = setInterval(() => {
       sent += 1;
-      fetch(`${API_BASE}/api/scan/status`, { cache: 'no-store' }).catch(() => {});
+      fetch(`${base}/api/scan/status`, { cache: 'no-store' }).catch(() => {});
       if (sent >= PING_LIMIT) clearInterval(id);
     }, PING_EVERY_MS);
     return () => clearInterval(id);

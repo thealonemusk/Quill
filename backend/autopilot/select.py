@@ -20,6 +20,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from enum import IntEnum
+from functools import lru_cache
 from typing import Dict, Iterable, List, Optional, Sequence
 
 from backend.applier.routing import Route, Routing, route_job
@@ -234,6 +235,7 @@ def cap_jobs_per_company(jobs, limit: int = EUROPE_JOBS_PER_COMPANY):
     return kept
 
 
+@lru_cache(maxsize=2048)
 def company_tier(company: str) -> Tier:
     raw = _clean(company)
     if any(re.search(rf"(?<![a-z0-9]){re.escape(s)}", raw) for s in _EXCLUDED_STEMS):

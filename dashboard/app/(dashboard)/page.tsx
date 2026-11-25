@@ -51,10 +51,12 @@ export default function JobsPage() {
 
   useEffect(() => {
     if (!applying) return;
+    let jobsTick = 0;
     const id = setInterval(async () => {
       try {
         const status = await api.getApplyStatus();
-        await loadJobs(true);
+        jobsTick += 1;
+        if (!status.running || jobsTick % 4 === 0) await loadJobs(true);
         if (!status.running) setApplying(false);
       } catch {}
     }, 2500);
@@ -63,10 +65,12 @@ export default function JobsPage() {
 
   useEffect(() => {
     if (!scanning) return;
+    let jobsTick = 0;
     const id = setInterval(async () => {
       try {
         const status = await api.getScanStatus();
-        await loadJobs(true);
+        jobsTick += 1;
+        if (!status.running || jobsTick % 4 === 0) await loadJobs(true);
         setScanStalled(!!status.stalled);
         if (!status.running) {
           setScanning(false);
