@@ -39,7 +39,7 @@ HOST_MIN_INTERVAL: Dict[str, float] = {
     "linkedin.com": 2.5,
     # One Render address. Workday limits that address, not each tenant hostname,
     # so intel.wd1 and nvidia.wd5 have to share a queue.
-    "myworkdayjobs.com": 2.0,
+    "myworkdayjobs.com": 4.0,
 }
 DEFAULT_MIN_INTERVAL = 0.0
 
@@ -225,12 +225,12 @@ def request(
         if response.status_code not in RETRYABLE_STATUSES:
             _note_ok(host)
             return response
-        # A 429 that is retried four more times, across twelve companies, is
-        # what turns a short limit into a block. Two retries, then stop.
+        # Two retries on a 429. More than that is what lengthens the block.
         limited = response.status_code == 429
-        if attempt == max_retries or (limited and attempt >= 2):
+        budget = 2 if limited else max_retries
+        if attempt >= budget:
             logger.warning(
-                f"HTTP {response.status_code} after {max_retries + 1} attempts: {url}"
+                f"HTTP {response.status_code} after {attempt + 1} attempts: {url}"
             )
             if response.status_code == 429:
                 _note_rate_limited(host)
@@ -239,7 +239,7 @@ def request(
         delay = _backoff_delay(attempt, response)
         logger.debug(
             f"HTTP {response.status_code} on {url} — retry "
-            f"{attempt + 1}/{max_retries} in {delay:.1f}s"
+            f"{attempt + 1}/{budget} in {delay:.1f}s"
         )
         time.sleep(delay)
 

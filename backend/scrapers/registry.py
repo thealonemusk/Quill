@@ -12,13 +12,9 @@ _FALLBACK_ROLES = [
     "Senior QA Automation Engineer",
     "SDET",
     "Test Automation Lead",
-]
-
-_DISCOVERY_EXTRA_ROLES = [
     "QA Manager",
     "Automation Architect",
 ]
-
 
 async def _run_linkedin(roles, max_jobs, headless):
     from backend.scrapers.linkedin import scrape_linkedin_jobs
@@ -136,12 +132,5 @@ def resolve_roles(settings_roles: List[str]) -> List[str]:
 
 
 def resolve_discovery_roles(settings_roles: List[str]) -> List[str]:
-    """Broader role list for scraping; keeps user roles first for priority."""
-    merged: List[str] = []
-    seen: set = set()
-    for role in list(settings_roles) + _FALLBACK_ROLES + _DISCOVERY_EXTRA_ROLES:
-        key = role.lower().strip()
-        if key and key not in seen:
-            seen.add(key)
-            merged.append(role.strip())
-    return merged if merged else list(_FALLBACK_ROLES)
+    """The configured titles only. A second list here is another request per board."""
+    return resolve_roles(settings_roles)

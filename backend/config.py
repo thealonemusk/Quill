@@ -46,7 +46,7 @@ class Settings(BaseSettings):
     user_portfolio: str = ""
 
     # Job preferences. QA titles, up to 10 years, Delhi NCR, every employer.
-    target_roles: str = "QA Automation Lead,QA Lead,Senior QA Automation Engineer,SDET,Test Automation Lead"
+    target_roles: str = "QA Automation Lead,QA Lead,Senior QA Automation Engineer,SDET,Test Automation Lead,QA Manager,Automation Architect"
     experience_years: int = 11
     preferred_locations: str = "Delhi,Noida,Gurugram,Ghaziabad,Faridabad"
     # Kept so an old setting still parses. The product searches Delhi NCR only.

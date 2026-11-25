@@ -343,7 +343,7 @@ def _scrape_lever(company: dict, roles: List[str]) -> List[dict]:
 
 WORKDAY_WD_SHARDS = ["wd1", "wd3", "wd5", "wd12", "wd103"]
 WORKDAY_PAGE_SIZE = 20  # API returns HTTP 400 above ~20 for most tenants
-WORKDAY_MAX_PAGES = 5
+WORKDAY_MAX_PAGES = 2
 
 
 def _workday_host_candidates(tenant: str, wd_hint: Optional[str] = None) -> List[str]:
@@ -603,15 +603,10 @@ def _scrape_custom(company: dict, roles: List[str]) -> List[dict]:
 # ─── Main Entry Point ────────────────────────────────────────────────────────
 
 def _expanded_search_roles(roles: List[str]) -> List[str]:
-    """Add entry-focused variants for career-site search APIs."""
+    """The configured titles only. Extra junior queries were a request each on Workday."""
     expanded: List[str] = []
     seen: set = set()
-    extras = [
-        "new grad", "university graduate", "entry level", "SDE 1", "associate engineer",
-        "junior software engineer", "graduate engineer", "early career", "fresher",
-        "software engineer I", "associate software engineer",
-    ]
-    for role in list(roles) + extras:
+    for role in roles:
         key = role.lower().strip()
         if key and key not in seen:
             seen.add(key)
@@ -672,13 +667,16 @@ async def scrape_company_career_jobs(
             logger.warning(f"Error scraping {name}: {e}")
             return []
 
-    # Cap concurrency so a full board list does not hit every host at once.
-    semaphore = asyncio.Semaphore(3)
+    # Workday shares one address limit, so its boards run one at a time.
+    # The other boards each have their own host and can overlap.
+    workday_gate = asyncio.Semaphore(1)
+    other_gate = asyncio.Semaphore(3)
 
     async def rate_limited_scrape(company: dict) -> List[dict]:
         if should_stop():
             return []
-        async with semaphore:
+        gate = workday_gate if company.get("type") == "workday" else other_gate
+        async with gate:
             if should_stop():
                 return []
             result = await scrape_one(company)

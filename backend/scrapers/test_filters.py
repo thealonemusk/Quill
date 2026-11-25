@@ -167,7 +167,7 @@ def test_location() -> None:
 
 def test_india_excluded_roles() -> None:
     section("1c. Delhi NCR keeps QA titles and drops everything else")
-    from backend.scrapers.company_careers import _role_matches
+    from backend.scrapers.company_careers import _expanded_search_roles, _role_matches
     from backend.scrapers.filter_utils import matches_region, passes_hard_filters
     from backend.scrapers.registry import resolve_discovery_roles
 
@@ -249,10 +249,17 @@ def test_india_excluded_roles() -> None:
     check("career sites keep Senior QA",
           _role_matches("Senior QA Engineer", roles), True)
     discovered = [r.lower() for r in resolve_discovery_roles(roles)]
-    check("search does not ask for DevOps", "devops engineer" not in discovered, True)
-    check("search does not ask for Data Engineer", "data engineer" not in discovered, True)
-    check("search does not ask for manual testing", "manual tester" not in discovered, True)
-    check("search asks for QA", "qa engineer" in discovered, True)
+    searched = [r.lower() for r in _expanded_search_roles(discovered)]
+    check("search does not ask for DevOps", "devops engineer" not in searched, True)
+    check("search does not ask for Data Engineer", "data engineer" not in searched, True)
+    check("search does not ask for manual testing", "manual tester" not in searched, True)
+    check("search asks for QA", "qa engineer" in searched, True)
+    for phrase in (
+        "new grad", "university graduate", "entry level", "sde 1", "fresher",
+        "junior software engineer", "early career", "associate software engineer",
+        "qa manager", "automation architect",
+    ):
+        check(f"search does not add {phrase}", phrase not in searched, True)
 
 
 def test_india_companies() -> None:
