@@ -4,27 +4,19 @@ from typing import Awaitable, Callable, Dict, List
 
 ScrapeFn = Callable[..., Awaitable[List[dict]]]
 
+# Titles that match a 9-year QA Automation Lead: Selenium, Appium,
+# Playwright, API, and a team he already runs. Not manual or junior search terms.
 _FALLBACK_ROLES = [
-    "Software Engineer",
-    "Backend Engineer",
-    "Full Stack Developer",
-    "AI Engineer",
-    "Software Developer",
-    "Platform Engineer",
-    "SDE",
-    "Machine Learning Engineer",
+    "QA Automation Lead",
+    "QA Lead",
+    "Senior QA Automation Engineer",
+    "SDET",
+    "Test Automation Lead",
 ]
 
-# Extra roles searched during discovery (user target_roles still drive scoring priority).
 _DISCOVERY_EXTRA_ROLES = [
-    "Associate Software Engineer",
-    "Junior Software Engineer",
-    "Entry Level Software Engineer",
-    "Python Developer",
-    "Java Developer",
-    "Golang Developer",
-    "Node.js Developer",
-    "Cloud Engineer",
+    "QA Manager",
+    "Automation Architect",
 ]
 
 

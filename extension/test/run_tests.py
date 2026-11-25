@@ -1591,7 +1591,7 @@ async def run_tailor_button() -> None:
                    tailorStatus: () => (++polls < 3)
                      ? { ok: true, data: { state: 'running' } }
                      : { ok: true, data: { state: 'done', ok: true, reworded: 3, refused: 1, pages: 1,
-                                            pdf_url: 'http://localhost:8000/api/autopilot/resume/job-1234abcd' } },
+                                            pdf_url: 'http://localhost:8000/api/autofill/resume/job-1234abcd' } },
                  };
                }"""
         )
@@ -1612,7 +1612,7 @@ async def run_tailor_button() -> None:
         check("the page's JD is sent", out["source"], "page")
         check("...in full", out["chars"] >= 300, True)
         check("the panel reports the result", "3 line(s) reworded, 1 refused" in out["text"], True)
-        check("...with a link to the PDF", out["href"], "http://localhost:8000/api/autopilot/resume/job-1234abcd")
+        check("...with a link to the PDF", out["href"], "http://localhost:8000/api/autofill/resume/job-1234abcd")
         check("the button is usable again", out["button"], False)
 
         # ── A form step with no description: the remembered one is used ──

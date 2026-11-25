@@ -4,7 +4,6 @@ import clsx from 'clsx';
 import { motion } from 'framer-motion';
 import { Check, ExternalLink, Send } from 'lucide-react';
 import { Job } from '@/lib/types';
-import { TIER_STYLE, type Tier } from '@/lib/autopilot';
 import { ApplyStatusBadge, AtsBadge, PlatformBadge, ScoreBadge, VisitedBadge } from '@/components/ui/Badge';
 import { safeHref } from '@/lib/safe-url';
 
@@ -18,9 +17,16 @@ interface JobRowProps {
   alwaysShowOpen?: boolean;
 }
 
+const TIER_STYLE: Record<string, { label: string; color: string; bg: string }> = {
+  FAANG: { label: 'FAANG', color: 'var(--tier-faang)', bg: 'var(--tier-faang-bg)' },
+  ELITE: { label: 'Elite', color: 'var(--signal)', bg: 'var(--signal-soft)' },
+  STRONG: { label: 'Strong', color: 'var(--success)', bg: 'var(--success-bg)' },
+  KNOWN: { label: 'Known', color: 'var(--tier-known)', bg: 'var(--tier-known-bg)' },
+};
+
 function Fame({ tier }: { tier?: string }) {
-  if (!tier || tier === 'UNKNOWN' || !(tier in TIER_STYLE)) return null;
-  const style = TIER_STYLE[tier as Tier];
+  if (!tier || !(tier in TIER_STYLE)) return null;
+  const style = TIER_STYLE[tier];
   return (
     <span
       className="shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none"

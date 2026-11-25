@@ -128,14 +128,12 @@ export default function SettingsPage() {
   };
 
   const handleClearJobs = async () => {
-    const place = cfg?.target_region === 'europe' ? 'Europe' : 'India';
-    if (!confirm(`Clear discovered ${place} jobs that are not applied? The other region is left as it is.`)) return;
+    if (!confirm('Clear discovered Delhi NCR jobs that are not applied?')) return;
     await api.clearDiscoveredJobs();
   };
 
   const handlePurgeExperienced = async () => {
-    const place = cfg?.target_region === 'europe' ? 'Europe' : 'India';
-    if (!confirm(`Remove ${place} jobs that fail the 0-2 year or role filters? The other region is left as it is.`)) return;
+    if (!confirm('Remove Delhi NCR jobs that are not QA roles, or that ask for more than your experience cap?')) return;
     await api.purgeExperiencedJobs();
   };
 
@@ -321,11 +319,11 @@ export default function SettingsPage() {
               </div>
               <div>
                 <Label>Target roles</Label>
-                <Input {...f('target_roles_str')} placeholder="Software Engineer, Backend Engineer" />
+                <Input {...f('target_roles_str')} placeholder="QA Automation Lead, QA Lead, SDET" />
               </div>
               <div>
                 <Label>Locations</Label>
-                <Input {...f('preferred_locations_str')} placeholder="Bengaluru, Remote" />
+                <Input {...f('preferred_locations_str')} placeholder="Delhi, Noida, Gurugram, Ghaziabad, Faridabad" />
               </div>
               <div>
                 <Label>Excluded companies</Label>

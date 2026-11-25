@@ -30,16 +30,9 @@ USER_AGENT = (
 )
 HEADERS = {"User-Agent": USER_AGENT}
 
-# Broader India coverage beyond user settings (scoring still ranks preferred cities).
-#
-# Every entry here multiplies the request count by the number of roles and
-# pages, so this list is the single biggest lever on whether LinkedIn blocks
-# the scan. "India" already returns roles in every city; the named cities are
-# here only because LinkedIn ranks a city query differently, so a handful of
-# the largest markets is worth it and a long tail is not.
+# Delhi NCR only. Each city multiplies the request count by roles and pages.
 EXTRA_LOCATIONS = [
-    "India",
-    "Bengaluru", "Hyderabad", "Pune", "Noida", "Mumbai",
+    "Delhi", "Noida", "Gurugram", "Ghaziabad", "Faridabad",
 ]
 
 # LinkedIn resolves these to the same geo, so searching both doubles the
@@ -255,13 +248,13 @@ def india_company_queries(roles) -> List[tuple]:
 
     if isinstance(roles, str):
         roles = [roles]
-    role = "Software Engineer"
+    role = "QA Engineer"
     for item in roles or []:
         text = (item or "").strip()
         if text:
             role = text
             break
-    return [(f"{role} {company}", "India") for company in INDIA_COMPANY_SEARCH]
+    return [(f"{role} {company}", "Delhi") for company in INDIA_COMPANY_SEARCH]
 
 
 def _collect_listings(

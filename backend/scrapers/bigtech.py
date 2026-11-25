@@ -39,8 +39,9 @@ TIMEOUT = 25
 AMAZON_SEARCH = "https://www.amazon.jobs/en/search.json"
 AMAZON_JOB = "https://www.amazon.jobs"
 
-INDIA_TOKENS = ("india", "bengaluru", "bangalore", "hyderabad", "pune", "mumbai",
-                "delhi", "noida", "gurgaon", "gurugram", "chennai", "kolkata")
+INDIA_TOKENS = (
+    "delhi", "noida", "gurgaon", "gurugram", "ghaziabad", "faridabad",
+)
 
 
 def _search_places() -> List[tuple]:
@@ -53,7 +54,13 @@ def _search_places() -> List[tuple]:
             ("Netherlands", "NLD"),
             ("Sweden", "SWE"),
         ]
-    return [("India", "IND")]
+    return [
+        ("Delhi", "IND"),
+        ("Noida", "IND"),
+        ("Gurugram", "IND"),
+        ("Ghaziabad", "IND"),
+        ("Faridabad", "IND"),
+    ]
 
 
 def _title_ok(title: str, roles: Iterable[str]) -> bool:
@@ -259,7 +266,7 @@ async def scrape_google(
     if settings.active_region == "europe":
         loc_re = "|".join(EUROPE_PREFERRED_LOCATIONS)
     else:
-        loc_re = "India|Bengaluru|Bangalore|Hyderabad|Pune|Gurgaon|Noida"
+        loc_re = "Delhi|Noida|Gurugram|Gurgaon|Ghaziabad|Faridabad|NCR"
     # The anchor itself carries no text; the title and location live in the
     # surrounding card, so walk up from the link.
     script = f"""() => Array.from(

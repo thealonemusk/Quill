@@ -17,7 +17,7 @@ async def scrape_instahyre_jobs(
 ) -> List[dict]:
     """Scrape jobs from Instahyre India."""
     roles = roles or settings.target_roles_list
-    locations = ["Bengaluru", "Delhi", "Noida", "Pune", "Hyderabad", "Mumbai" , "Gurugram"]
+    locations = ["Delhi", "Noida", "Gurugram", "Ghaziabad", "Faridabad"]
     all_jobs = []
 
     async with async_playwright() as pw:

@@ -1,36 +1,16 @@
 """
 Filter utilities — text parsing and strict experience/title/location checks.
-Hard limits: <= 2 years experience, no frontend-only roles.
-Location follows the region: India, or the UK, Ireland, Germany, the Netherlands, and Sweden.
+Hard limits: QA automation and lead titles, requirement floor at most 11 years, Delhi NCR only.
+Europe checks remain for the old region path; the product no longer offers it.
 """
 
 import re
 from typing import Optional, Tuple
 
-# Matched as whole words (see `_title_has_keyword`), never as substrings:
-# "vp" rejected "Software Engineer - VPN", "head" rejected "Headless Commerce"
-# and "lead" rejected "Leadership Tools". "leader" is listed on its own because
-# the bounded "lead" no longer reaches "Team Leader".
-EXCLUDED_TITLE_KEYWORDS = [
-    "senior", "sr.", "sr", "lead", "leader", "staff", "principal", "manager",
-    "director", "head", "architect", "sde 2", "sde-2", "sde2", "sde 3", "sde-3",
-    "sde3", "sde ii", "sde-ii", "sde iii", "sde-iii", "level 2", "level 3", "level 4",
-    "l2", "l3", "l4", "l5",
-    "expert", "vp", "vice president", "chief", "tech lead", "team lead",
-    "consultant", "specialist", "advanced software", "advanced engineer",
-    "advanced developer",
-]
-
-EXCLUDED_TITLE_REGEXES = [
-    r'\b(?:ii|iii|iv|v)(?:new)?\b',
-    r'\bl[2-7]\b',
-    # A standalone level number: "Engineer 2", "SDE - 3". The digit must end the
-    # token — without `(?![\d.a-z-])` this read " 2026" in "2026 New Grad", "5G"
-    # and "3D" as levels, and "4-9 years" as Engineer 4.
-    r'(?<!\d)[-_\s](?:2|3|4|5)(?![\d.a-z-])(?!(?:\s*\+|\s*(?:years?|yrs?|yr|y)\b|\s+to\s+\d))',
-]
-
-MAX_JD_EXPERIENCE_YEARS = 2.0
+# Nikhil's resume is 9 years as a QA Automation Lead. Lead postings say
+# "8-12" or "10+". The floor of that range is the requirement, so the cap
+# sits two years above the resume. "12+ years" still falls outside.
+MAX_JD_EXPERIENCE_YEARS = 11.0
 
 INTERN_PATTERN = re.compile(r'\bintern(?:s|ship)?\b', re.IGNORECASE)
 
@@ -114,6 +94,12 @@ JD_GENERIC_INDIA = {"india", "bharat", "pan india"}
 NCR_RE = re.compile(
     r'(?<![a-z0-9])(?:delhi[\s\-/]*ncr|ncr\s*(?:[,(\-/]\s*)?(?:india|region|delhi)|^\s*ncr\s*$)(?![a-z0-9])'
 )
+# Delhi, Noida (including Greater Noida), Gurugram/Gurgaon, Ghaziabad, Faridabad.
+# "noida" is a whole word, so it also matches inside "greater noida".
+NCR_CITIES = (
+    "new delhi", "delhi", "greater noida", "noida",
+    "gurugram", "gurgaon", "ghaziabad", "faridabad",
+)
 # Phrases that say where the role itself sits. Only what follows one of these,
 # within a few words, is read as the job's location from the JD.
 JD_LOCATION_CUE_RE = re.compile(
@@ -162,15 +148,10 @@ FRONTEND_KEEP = (
 )
 
 
-def _title_has_keyword(title_lower: str, keyword: str) -> bool:
-    """Whole-word match; a keyword ending in "." ("sr.") needs no right edge."""
-    left = r'(?<![a-z0-9])'
-    right = '' if keyword.endswith('.') else r'(?![a-z0-9])'
-    return bool(re.search(left + re.escape(keyword) + right, title_lower))
-
-
 def _experience_exceeds_cap(min_y: float, max_y: float, cap: float = MAX_JD_EXPERIENCE_YEARS) -> bool:
-    return min_y > cap or max_y > cap
+    # "8-12 years" is a band whose floor is 8. The top of the band is not a
+    # separate requirement. "12+ years" fails because its floor is 12.
+    return min_y > cap
 
 
 def _pair(min_y: float, max_y: float) -> Tuple[float, float]:
@@ -234,24 +215,13 @@ def is_job_experience_valid(
     max_years: float = MAX_JD_EXPERIENCE_YEARS,
     require_jd: bool = True,
 ) -> Tuple[bool, str]:
-    # The caller's cap is honoured: every caller passes settings.experience_years
-    # (EXPERIENCE_YEARS, 2 today, shown as the "hard limit" at startup), so the
-    # effective cap is unchanged. This used to ignore the argument outright.
+    # The caller's cap is honoured: every caller passes settings.experience_years.
     cap = MAX_JD_EXPERIENCE_YEARS if max_years is None else float(max_years)
     title =(job_data.get("title") or "").strip()
-    title_lower = title.lower()
     jd_text = (job_data.get("jd_text") or "").strip()
 
     if title and INTERN_PATTERN.search(title):
         return False, f"Title mentions intern/internship: '{title}'"
-
-    for keyword in EXCLUDED_TITLE_KEYWORDS:
-        if _title_has_keyword(title_lower, keyword):
-            return False, f"Title contains senior/excluded keyword: '{keyword}' in '{title}'"
-
-    for pattern in EXCLUDED_TITLE_REGEXES:
-        if re.search(pattern, title_lower):
-            return False, f"Title matches excluded level pattern: '{pattern}' in '{title}'"
 
     ranges = []
     for blob in (title, job_data.get("experience_required", "") or ""):
@@ -309,34 +279,55 @@ def _contains_marker(blob: str, marker: str) -> bool:
     return bool(re.search(rf'(?<![a-z0-9]){re.escape(marker)}(?![a-z0-9])', blob))
 
 
-def india_excluded_role(title: str) -> str:
-    """A title India should not keep. Empty means it stays.
+# Whole words, so "latest" and "contest" are not testing roles, and "qa" does
+# not match inside another word. "SDET – I" still matches: the dash is not a letter.
+_QA_MARKERS = (
+    "quality assurance",
+    "quality engineer",
+    "quality analyst",
+    "software development engineer in test",
+    "software engineer in test",
+    "test engineer",
+    "test automation",
+    "automation architect",
+    "automation lead",
+    "automation engineer",
+    "sdet",
+    "tester",
+    "testing",
+    "test",
+    "qa",
+)
 
-    'support' alone is not enough: 'Software Engineer, Customer Support
-    Platform' is a software role. '.net' is a substring because 'asp.net'
-    has a letter before the dot, so a word boundary would miss it. 'sre'
-    is a whole word so it does not hit 'software'.
-    """
+
+# A 9-year automation lead. Junior titles and manual-only titles are a
+# different profile. "Manual and automation" stays: it is not manual-only.
+_JUNIOR_TITLES = (
+    "junior", "fresher", "trainee", "intern", "internship",
+    "entry level", "entry-level",
+)
+_MANUAL_ONLY = ("manual tester", "manual testing", "manual qa")
+
+
+def unsuitable_qa_title(title: str) -> str:
+    """Junior or manual-only. Empty means the title is still a candidate."""
     t = (title or "").lower()
-    if _contains_marker(t, "site reliability") or _contains_marker(t, "sre"):
-        return "Site Reliability Engineer"
-    if _contains_marker(t, "devops"):
-        return "DevOps Engineer"
-    if _contains_marker(t, "support engineer"):
-        return "Support Engineer"
-    if _contains_marker(t, "dotnet") or ".net" in t or _contains_marker(t, "dot net"):
-        return "Dotnet Developer"
-    # "database" and "metadata" do not contain this phrase. "Big Data" on a
-    # software title does not either.
-    if _contains_marker(t, "data engineer"):
-        return "Data Engineer"
-    # Whole words, so "latest" and "contest" are not testing roles. "SDET – I"
-    # still matches: the dash is not a letter.
-    if (_contains_marker(t, "sdet") or _contains_marker(t, "qa")
-            or _contains_marker(t, "tester") or _contains_marker(t, "testing")
-            or _contains_marker(t, "test") or _contains_marker(t, "quality assurance")):
-        return "Testing"
+    if any(_contains_marker(t, marker) for marker in _JUNIOR_TITLES):
+        return "Junior QA role"
+    if any(_contains_marker(t, marker) for marker in _MANUAL_ONLY):
+        return "Manual-only QA role"
     return ""
+
+
+def india_excluded_role(title: str) -> str:
+    """A title that is not a suitable QA role. Empty means the title stays."""
+    why = unsuitable_qa_title(title)
+    if why:
+        return why
+    t = (title or "").lower()
+    if any(_contains_marker(t, marker) for marker in _QA_MARKERS):
+        return ""
+    return "Not a QA role"
 
 
 def _india_in(blob: str, markers=INDIA_MARKERS) -> bool:
@@ -594,54 +585,60 @@ def is_location_allowed(job_data: dict, region: str = "india") -> Tuple[bool, st
     return _india_location_allowed(job_data)
 
 
+def location_in_ncr(blob: str) -> bool:
+    """Delhi NCR: the cities, or an explicit NCR label. Bare "NCR Voyix" is not."""
+    low = (blob or "").lower()
+    if NCR_RE.search(low):
+        return True
+    return any(_contains_marker(low, city) for city in NCR_CITIES)
+
+
+def _location_unspecified(loc: str) -> bool:
+    if not loc:
+        return True
+    if "remote" in loc or "work from home" in loc or loc in {"wfh", "anywhere"}:
+        return True
+    return "multiple" in loc
+
+
+def _other_india_city(blob: str) -> bool:
+    """An Indian city outside Delhi NCR. State names are not a city."""
+    skip = set(NCR_CITIES) | JD_GENERIC_INDIA | {
+        "haryana", "uttar pradesh", "telangana", "karnataka", "maharashtra",
+        "tamil nadu", "kerala", "west bengal",
+    }
+    return any(_contains_marker(blob, marker) for marker in INDIA_MARKERS if marker not in skip)
+
+
 def _india_location_allowed(job_data: dict) -> Tuple[bool, str]:
+    """Delhi NCR only. A stated city wins over JD boilerplate."""
     location = (job_data.get("location") or "").strip()
     title = job_data.get("title") or ""
     jd = (job_data.get("jd_text") or "")[:1200].lower()
-    platform = (job_data.get("platform") or "").lower()
-
-    # Cities the user will not relocate to. Matched on the location and title
-    # only, never the JD — a Bengaluru posting that merely mentions a Chennai
-    # office in its boilerplate is still a Bengaluru job.
-    where = f"{location} {title}".lower()
-    for city in EXCLUDED_CITIES:
-        if _contains_marker(where, city):
-            return False, f"Excluded city: '{location or title}'"
-
-    # The location field (and title) decide first. The JD used to be pooled in
-    # with them and an India hit anywhere won, so "Seattle, WA" whose
-    # boilerplate said "our teams span the US, Europe and India" came through
-    # as an India job.
-    loc_india = _india_in(where) or bool(NCR_RE.search(location.lower()))
-    loc_abroad = _abroad_in(where) or bool(US_STATE_RE.search(location))
-    if loc_india:
-        # Includes multi-city listings such as "Bengaluru; Seattle, WA".
-        return True, "India location"
-    if loc_abroad:
-        return False, f"Non-India location: '{location or title}'"
-
-    # Location empty or uninformative ("Remote", "Multiple locations"): only
-    # now does the JD get a say, and only through India-specific phrasing — a
-    # location cue ("based in Pune"), or an Indian city with no foreign one.
-    cue_india, cue_abroad = _jd_cued_places(jd)
-    if cue_india:
-        return True, "India location (from JD)"
-    if cue_abroad:
-        return False, f"Non-India location (from JD): '{location or title}'"
-    jd_city = _india_in(jd, tuple(m for m in INDIA_MARKERS if m not in JD_GENERIC_INDIA))
-    jd_abroad = _abroad_in(jd)
-    if jd_city and not jd_abroad:
-        return True, "India location (from JD)"
-    if jd_abroad and not jd_city:
-        return False, f"Non-India location: '{location or title}'"
-    if platform in INDIA_PLATFORMS:
-        return True, "India job board"
     loc = location.lower()
+    shown = location or title
+
+    if location_in_ncr(loc):
+        return True, "Delhi NCR"
+    if not _location_unspecified(loc):
+        return False, f"Outside Delhi NCR: '{shown}'"
+
+    cue_ncr = cue_elsewhere = False
+    for cue in JD_LOCATION_CUE_RE.finditer(jd):
+        window = jd[cue.end():cue.end() + JD_CUE_WINDOW]
+        if location_in_ncr(window):
+            cue_ncr = True
+        elif _india_in(window) or _abroad_in(window) or US_STATE_RE.search(window):
+            cue_elsewhere = True
+    if cue_ncr:
+        return True, "Delhi NCR (from JD)"
+    if cue_elsewhere:
+        return False, f"Outside Delhi NCR (from JD): '{shown}'"
+    if location_in_ncr(jd) and not _abroad_in(jd) and not _other_india_city(jd):
+        return True, "Delhi NCR (from JD)"
     if not loc:
         return False, "Missing location"
-    if "remote" in loc or "work from home" in loc or loc in {"wfh", "anywhere"}:
-        return False, f"Remote outside India: '{location}'"
-    return False, f"Non-India location: '{location}'"
+    return False, f"Outside Delhi NCR: '{shown}'"
 
 
 def is_closed_posting(job_data: dict) -> Tuple[bool, str]:
@@ -658,52 +655,8 @@ def is_closed_posting(job_data: dict) -> Tuple[bool, str]:
     return False, ""
 
 
-# An unknown employer is kept only for a software title or an AI engineer
-# title. "Data Engineer" and "Java Developer" are not either, and neither is
-# a recruiter whose name splits into "talent …".
-_UNKNOWN_ROLE_PHRASES = (
-    "software engineer", "software development engineer",
-    "backend engineer", "backend developer", "backend development",
-    "sde",
-)
-# "ai" and "ml" are whole words, so "email" and "html" do not qualify.
-_UNKNOWN_AI_WORDS = ("ai", "ml", "artificial intelligence", "machine learning")
-
-
-def _unknown_role_ok(title: str) -> bool:
-    t = (title or "").lower()
-    if any(_contains_marker(t, phrase) for phrase in _UNKNOWN_ROLE_PHRASES):
-        return True
-    if not _contains_marker(t, "engineer"):
-        return False
-    return any(_contains_marker(t, word) for word in _UNKNOWN_AI_WORDS)
-
-
-def _unknown_shop(company: str) -> bool:
-    # Split TalentRabbit before the word check, so Talentica is left alone.
-    name = re.sub(r"([a-z])([A-Z])", r"\1 \2", company or "").lower()
-    return any(_contains_marker(name, marker) for marker in ("talent", "events", "client of"))
-
-
 def india_company_block(company: str, title: str = "") -> str:
-    """Why an India row should be dropped for its employer. Empty if it stays.
-
-    A tiered company stays whatever the title is. A staffing firm never does.
-    An unknown company stays only for a software or AI engineer title, and a missing title
-    does not qualify — the named-company search calls this with the company
-    alone, so a recruiter card in those results stays out.
-    """
-    from backend.autopilot.select import Tier, company_tier
-
-    if not (company or "").strip():
-        return "Unknown company: ''"
-    tier = company_tier(company)
-    if tier >= Tier.KNOWN:
-        return ""
-    if tier is Tier.EXCLUDED:
-        return f"Excluded company: '{company}'"
-    if _unknown_shop(company) or not _unknown_role_ok(title):
-        return f"Unknown company: '{company}'"
+    """Employer size and brand are not a reason to drop a posting."""
     return ""
 
 

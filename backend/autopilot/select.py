@@ -251,68 +251,42 @@ def company_tier(company: str) -> Tier:
 
 # ── Role and location fit ────────────────────────────────────────────────────
 
-ROLE_STRONG = ("backend", "back end", "software engineer", "software development engineer",
-               "sde", "full stack", "fullstack", "platform engineer", "distributed systems",
-               "infrastructure engineer", "systems engineer", "server")
-ROLE_OK = ("software", "engineer", "developer", "programmer")
-# Whole words (see `_bad_role`). As bare substrings "intern" zeroed "Internal
-# Tools", "International Payments" and "Internet Infrastructure", and "sales"
-# zeroed "Salesforce Platform".
-ROLE_BAD = ("frontend only", "ui/ux", "designer", "qa", "test engineer", "sdet",
-            "recruiter", "intern", "interns", "internship",
-            "data entry", "analyst", "manager", "director", "principal", "staff",
-            "senior staff", "lead", "architect", "head of", "vp")
-# Functions that disqualify a title only when it is not also plainly a
-# software-engineering title: "Sales Engineer" and "Technical Support
-# Engineer" are out, "Software Engineer, Customer Support Platform" is in.
-ROLE_BAD_UNLESS_SWE = ("support", "sales", "marketing", "hr")
-SWE_TITLES = ("software engineer", "software development engineer", "software developer",
-              "backend engineer", "backend developer", "sde", "full stack engineer",
-              "full stack developer", "platform engineer")
-
-
-def _bad_role(t: str) -> bool:
-    if any(_has_word(t, bad) for bad in ROLE_BAD):
-        return True
-    if any(_has_word(t, bad) for bad in ROLE_BAD_UNLESS_SWE):
-        return not any(_has_word(t, swe) for swe in SWE_TITLES)
-    return False
-
-# "ii" belongs here with "iii" and "iv": `filter_utils` already rejects a
-# "Software Engineer II" title outright, so a job carrying one into selection
-# was scoring as though it were entry level.
-SENIOR_MARKERS = ("senior", "sr.", "sr ", "staff", "principal", "lead", "manager",
-                  "director", "head", "architect", "vp", "ii", "iii", "iv")
+ROLE_STRONG = (
+    "qa automation", "automation lead", "test automation", "automation engineer",
+    "automation architect", "qa lead", "test lead", "qa manager",
+    "sdet", "software development engineer in test", "software engineer in test",
+)
+ROLE_OK = (
+    "qa engineer", "quality assurance", "quality engineer", "test engineer", "senior qa",
+)
 
 
 def role_score(title: str) -> float:
+    """Lead and automation titles score highest. Manual-only and junior score nothing."""
+    from backend.scrapers.filter_utils import unsuitable_qa_title
+
     t = (title or "").lower()
-    if _bad_role(t):
+    if unsuitable_qa_title(t) or _has_word(t, "recruiter"):
         return 0.0
-    if any(s in t for s in ROLE_STRONG):
-        base = 30.0
-    elif any(s in t for s in ROLE_OK):
-        base = 18.0
-    else:
-        return 0.0
-    # A 2-year profile should not be spending applications on senior reqs.
-    if any(re.search(rf"(?<![a-z]){re.escape(m.strip())}(?![a-z])", t) for m in SENIOR_MARKERS):
-        base -= 14.0
-    return max(0.0, base)
+    if any(_has_word(t, phrase) for phrase in ROLE_STRONG):
+        return 30.0
+    if any(_has_word(t, phrase) for phrase in ROLE_OK):
+        return 18.0
+    return 0.0
 
 
 def location_score(location: str, preferred: Sequence[str]) -> float:
+    """Delhi NCR only. A city outside that list scores nothing."""
     loc = (location or "").lower()
     if not loc:
-        return 4.0                      # unknown, not disqualifying
+        return 0.0
     for want in preferred:
         w = (want or "").strip().lower()
         if w and re.search(rf"(?<![a-z]){re.escape(w)}(?![a-z])", loc):
             return 15.0
-    if "remote" in loc:
+    from backend.scrapers.filter_utils import location_in_ncr
+    if location_in_ncr(loc):
         return 12.0
-    if "india" in loc:
-        return 9.0
     return 0.0
 
 
@@ -372,12 +346,9 @@ def evaluate(job, preferred_locations: Sequence[str]) -> Candidate:
     reasons: List[str] = []
     rejected = ""
 
-    if tier is Tier.EXCLUDED:
-        rejected = "staffing agency or IT services company"
-
     r_score = role_score(job.title or "")
     if not rejected and r_score <= 0:
-        rejected = "title is not an eligible engineering role"
+        rejected = "title is not a QA role"
 
     l_score = location_score(job.location or "", preferred_locations)
     if not rejected and l_score <= 0:
@@ -435,7 +406,15 @@ def select(
     """
     evaluated = [evaluate(job, preferred_locations) for job in jobs]
 
-    eligible = [c for c in evaluated if c.ok and c.tier >= min_tier]
+    # UNKNOWN is the default floor. Staffing and unknown employers stay in
+    # that set: company size is not a reason to drop a QA role.
+    eligible = [
+        c for c in evaluated
+        if c.ok and (
+            c.tier >= min_tier
+            or (min_tier <= Tier.UNKNOWN and c.tier is Tier.EXCLUDED)
+        )
+    ]
     if auto_only:
         eligible = [c for c in eligible if c.routing.route is Route.AUTO]
 

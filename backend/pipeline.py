@@ -118,7 +118,7 @@ def upsert_jobs(jobs: list, db: Session) -> int:
     # dup key -> hosts it was accepted from (see `_is_cross_post`).
     batch_dups: dict = {}
 
-    max_exp_years = getattr(settings, "experience_years", 2)
+    max_exp_years = getattr(settings, "experience_years", 10)
     min_score = getattr(settings, "min_relevance_score", 55)
 
     excluded = [c.lower() for c in settings.excluded_companies_list if c.strip()]

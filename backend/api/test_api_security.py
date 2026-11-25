@@ -123,10 +123,10 @@ def run() -> None:
     check("a javascript: job URL is refused", r.status_code, 422)
 
     print("\nPath-taking endpoints")
-    check("screenshot with a traversal id is refused",
-          local.get("/api/autopilot/screenshot/..%5C..%5Cconfig%5Cx").status_code, 404)
+    check("tailored resume with a traversal id is refused",
+          local.get("/api/autofill/resume/..%5C..%5Cconfig%5Cx").status_code, 404)
     check("tailored resume with a glob id is refused",
-          local.get("/api/autopilot/resume/*").status_code, 404)
+          local.get("/api/autofill/resume/*").status_code, 404)
 
 
 if __name__ == "__main__":

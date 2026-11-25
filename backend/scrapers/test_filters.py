@@ -1,9 +1,9 @@
 """
 Job-discovery filters, dedup, company tiers and the seen ledger.
 
-Every "must pass" case below was a real job the filters threw away, and every
-"must reject" case is a guard that the fix did not loosen what the filters are
-for: 0-2 years, no senior titles, India only, no body shops.
+The search follows a 9-year QA Automation Lead in Delhi NCR. Every company
+stays. Lead, SDET, and automation titles stay. Manual-only, junior, non-QA,
+other cities, and a requirement whose floor is above 11 years do not.
 
 Nothing here touches the network or Quill.db: DB checks run against an
 in-memory SQLite database, and the apply-all check stubs out the apply run.
@@ -58,9 +58,12 @@ def _title_ok(title: str) -> bool:
     return is_job_experience_valid({"title": title, "jd_text": ""}, require_jd=False)[0]
 
 
-def _exp_ok(jd: str, max_years=2) -> bool:
+def _exp_ok(jd: str, max_years=None) -> bool:
+    kwargs = {"require_jd": False}
+    if max_years is not None:
+        kwargs["max_years"] = max_years
     return is_job_experience_valid(
-        {"title": "Software Engineer", "jd_text": jd}, max_years=max_years, require_jd=False
+        {"title": "QA Engineer", "jd_text": jd}, **kwargs
     )[0]
 
 
@@ -136,22 +139,26 @@ def test_location() -> None:
     check("Indianapolis is not India", _loc("Indianapolis, IN"), False)
     check("Indianapolis without a state is not India", _loc("Indianapolis"), False)
 
-    for city in ("Bengaluru, Karnataka", "Hyderabad", "Pune, Maharashtra", "Delhi NCR",
-                 "Gurugram, Haryana", "NCR", "Bangalore Urban, India"):
+    for city in ("Delhi NCR", "NCR", "New Delhi", "Noida", "Greater Noida",
+                 "Gurugram, Haryana", "Gurgaon", "Ghaziabad", "Faridabad",
+                 "Noida; Seattle, WA"):
         check(f"{city!r} accepted", _loc(city), True)
-    check("multi-city 'Bengaluru; Seattle, WA' accepted", _loc("Bengaluru; Seattle, WA"), True)
-    check("Chennai still excluded", _loc("Chennai, Tamil Nadu"), False)
+    for city in ("Bengaluru, Karnataka", "Hyderabad", "Pune, Maharashtra", "Mumbai",
+                 "Chennai, Tamil Nadu", "Bangalore Urban, India", "Remote - India",
+                 "Bengaluru; Seattle, WA"):
+        check(f"{city!r} rejected", _loc(city), False)
 
-    section("1. Location: ambiguous location, JD decides only with India-specific phrasing")
-    check("Remote + 'based in Pune' accepted", _loc("Remote", "This role is based in Pune, India."), True)
-    check("empty + 'Location: Hyderabad' accepted", _loc("", "Location: Hyderabad (hybrid)"), True)
+    section("1. Location: ambiguous location, JD decides only with an NCR city")
+    check("Remote + 'based in Noida' accepted", _loc("Remote", "This role is based in Noida."), True)
+    check("Remote + 'based in Pune' rejected", _loc("Remote", "This role is based in Pune, India."), False)
+    check("empty + 'Location: Hyderabad' rejected", _loc("", "Location: Hyderabad (hybrid)"), False)
     check("Multiple locations + 'based in Seattle' rejected",
           _loc("Multiple locations", "This role is based in Seattle, WA."), False)
     check("Remote + generic 'India' mention rejected",
           _loc("Remote", "Our teams span the US, Europe and India."), False)
     check("empty + JD 'Join NCR Voyix' rejected", _loc("", "Join NCR Voyix today."), False)
     check("empty + JD 'Delhi NCR office' accepted", _loc("", "Work from our Delhi NCR office."), True)
-    check("India board, no location still allowed", _loc("", platform="naukri"), True)
+    check("India board with no location rejected", _loc("", platform="naukri"), False)
     check("missing location still rejected", _loc(""), False)
 
 
@@ -159,19 +166,19 @@ def test_location() -> None:
 
 
 def test_india_excluded_roles() -> None:
-    section("1c. India drops SRE, DevOps, Support, Dotnet, Data Engineer, and testing")
+    section("1c. Delhi NCR keeps QA titles and drops everything else")
     from backend.scrapers.company_careers import _role_matches
     from backend.scrapers.filter_utils import matches_region, passes_hard_filters
     from backend.scrapers.registry import resolve_discovery_roles
 
     def kept(title: str, region: str = "india") -> bool:
-        location = "Bengaluru, Karnataka" if region == "india" else "London, United Kingdom"
+        location = "Noida" if region == "india" else "London, United Kingdom"
         return passes_hard_filters(
             {
                 "title": title,
                 "company": "Stripe",
                 "location": location,
-                "jd_text": "We are hiring a software engineer to build APIs.",
+                "jd_text": "We are hiring a QA engineer to test APIs.",
                 "platform": "linkedin",
             },
             region=region,
@@ -179,18 +186,6 @@ def test_india_excluded_roles() -> None:
         )[0]
 
     for title in (
-        "Site Reliability Engineer",
-        "SRE",
-        "DevOps Engineer",
-        "Support Engineer",
-        "Technical Support Engineer",
-        "Dotnet Developer",
-        ".NET Developer",
-        "Dot Net Developer",
-        "ASP.NET Developer",
-        "Data Engineer",
-        "Data Engineer-Data Platforms-Google",
-        "Senior Data Engineer",
         "SDET – I (Software Development Engineer in Test)",
         "SDET, Portworx",
         "Software Development Engineer in Test",
@@ -199,23 +194,45 @@ def test_india_excluded_roles() -> None:
         "Software Engineer, Test",
         "Software Engineer - UI Test",
         "Test Engineer",
+        "Senior Test Engineer",
         "Software QA Engineer",
         "QA Engineer",
+        "Senior QA Engineer",
+        "QA Lead",
         "Quality Assurance Engineer",
+        "QA Automation Lead",
+        "Test Automation Lead",
+        "Automation Architect",
     ):
-        check(f"India drops {title!r}", kept(title), False)
-    check("India keeps Software Engineer", kept("Software Engineer"), True)
-    check("India keeps a title that merely contains the letters test",
-          kept("Software Engineer, Latest"), True)
-    check("India keeps a software title about big data",
-          kept("Software Engineer, Big Data"), True)
-    check("India keeps Database Engineer", kept("Database Engineer"), True)
-    check("India keeps Customer Support Platform",
-          kept("Software Engineer, Customer Support Platform"), True)
-    check("India keeps Backend Engineer", kept("Backend Engineer"), True)
-    check("stored India DevOps row stays off the board",
+        check(f"NCR keeps {title!r}", kept(title), True)
+    for title in ("Manual Tester", "Manual QA Engineer", "Junior QA Engineer", "Fresher QA", "QA Intern"):
+        check(f"NCR drops {title!r}", kept(title), False)
+    for title in (
+        "Site Reliability Engineer",
+        "SRE",
+        "DevOps Engineer",
+        "Support Engineer",
+        "Technical Support Engineer",
+        "Dotnet Developer",
+        ".NET Developer",
+        "Data Engineer",
+        "Software Engineer",
+        "Software Engineer, Latest",
+        "Software Engineer, Big Data",
+        "Database Engineer",
+        "Software Engineer, Customer Support Platform",
+        "Backend Engineer",
+    ):
+        check(f"NCR drops {title!r}", kept(title), False)
+    check("stored Noida QA row stays on the board",
           matches_region(
-              {"title": "DevOps Engineer", "location": "Bengaluru", "company": "Stripe",
+              {"title": "QA Engineer", "location": "Noida", "company": "Stripe",
+               "jd_text": "", "platform": "linkedin"},
+              "india",
+          ), True)
+    check("stored Noida DevOps row stays off the board",
+          matches_region(
+              {"title": "DevOps Engineer", "location": "Noida", "company": "Stripe",
                "jd_text": "", "platform": "linkedin"},
               "india",
           ), False)
@@ -224,32 +241,36 @@ def test_india_excluded_roles() -> None:
           kept("Site Reliability Engineer", "europe"), True)
     check("Europe keeps Data Engineer", kept("Data Engineer", "europe"), True)
     check("Europe keeps SDET", kept("SDET", "europe"), True)
-    roles = ["Software Engineer", "Backend Engineer"]
-    check("career sites do not treat DevOps as software",
+    roles = ["QA Engineer", "SDET"]
+    check("career sites do not treat DevOps as QA",
           _role_matches("DevOps Engineer", roles), False)
-    check("career sites do not treat SRE as software",
+    check("career sites do not treat SRE as QA",
           _role_matches("Site Reliability Engineer", roles), False)
+    check("career sites keep Senior QA",
+          _role_matches("Senior QA Engineer", roles), True)
     discovered = [r.lower() for r in resolve_discovery_roles(roles)]
-    check("India search does not ask for DevOps", "devops engineer" not in discovered, True)
-    check("India search does not ask for Data Engineer", "data engineer" not in discovered, True)
+    check("search does not ask for DevOps", "devops engineer" not in discovered, True)
+    check("search does not ask for Data Engineer", "data engineer" not in discovered, True)
+    check("search does not ask for manual testing", "manual tester" not in discovered, True)
+    check("search asks for QA", "qa engineer" in discovered, True)
 
 
 def test_india_companies() -> None:
-    section("1d. India keeps tiered companies, and a software role at an unknown one")
+    section("1d. Every company stays when the title is QA and the city is NCR")
     from backend.autopilot.select import INDIA_COMPANY_SEARCH, Tier, company_tier
     from backend.scrapers.filter_utils import (
         india_company_block, matches_region, passes_hard_filters,
     )
     from backend.scrapers.linkedin import india_company_queries
 
-    def kept(company: str, region: str = "india", title: str = "Software Engineer") -> bool:
-        location = "Bengaluru, Karnataka" if region == "india" else "London, United Kingdom"
+    def kept(company: str, region: str = "india", title: str = "QA Engineer") -> bool:
+        location = "Noida" if region == "india" else "London, United Kingdom"
         return passes_hard_filters(
             {
                 "title": title,
                 "company": company,
                 "location": location,
-                "jd_text": "We are hiring a software engineer to build APIs.",
+                "jd_text": "We are hiring a QA engineer to test APIs.",
                 "platform": "linkedin",
             },
             region=region,
@@ -259,55 +280,36 @@ def test_india_companies() -> None:
     for company in (
         "Google", "Intuit", "Flipkart", "Dream11",
         "Goldman Sachs Services Pvt Ltd", "Pixel Forge", "Square Yards",
-    ):
-        check(f"India keeps {company!r}", kept(company), True)
-    for company in (
         "Infosys", "NetM Corporate Solutions", "TalentRabbit", "EXL",
-        "Rootlex Technologies Private Limited", "CXO Events", "Client of SCHS", "",
+        "Rootlex Technologies Private Limited", "CXO Events", "Client of SCHS",
+        "Talentica", "Teradata", "",
     ):
-        check(f"India drops {company!r}", kept(company), False)
-    check("Talentica is not treated as a recruiter", kept("Talentica"), True)
-    check("unknown company keeps a backend title",
-          kept("Pixel Forge", title="Backend Engineer - SDE 1"), True)
+        check(f"NCR keeps {company!r}", kept(company), True)
     for title in (
-        "AI Engineer", "Agentic AI Engineer", "AI/ML Engineer",
-        "Artificial Intelligence Engineer", "ML Engineer",
-        "Machine Learning Engineer", "Engineer - AI",
+        "Backend Engineer - SDE 1", "AI Engineer", "Data Engineer",
+        "Java Developer", "Software Developer", "Software Development Engineer",
     ):
-        check(f"unknown company keeps {title!r}", kept("Pixel Forge", title=title), True)
-    for title in (
-        "Data Engineer", "Java Developer", "Junior Web Developer",
-        "Full Stack Developer", "Software Developer", "AI Developer",
-        "Data Scientist",
-    ):
-        check(f"unknown company drops {title!r}", kept("Pixel Forge", title=title), False)
-    check("unknown company keeps a software development engineer",
-          kept("Pixel Forge", title="Software Development Engineer"), True)
-    check("Teradata software engineer slides", kept("Teradata"), True)
-    check("Teradata AI engineer slides", kept("Teradata", title="AI Engineer"), True)
-    check("a staffing firm stays out on an AI title",
-          kept("EXL", title="Artificial Intelligence Engineer"), False)
-    check("a company search without a title still drops an unknown name",
-          bool(india_company_block("Pixel Forge")), True)
-    check("a tiered company keeps a title the unknown gate would drop",
-          kept("Google", title="Java Developer"), True)
-    check("India drops Data Engineer at a known company",
-          kept("Google", title="Data Engineer"), False)
-    check("stored unknown software role stays on the board",
+        check(f"non-QA dropped at any company: {title!r}", kept("Pixel Forge", title=title), False)
+    check("Google still drops a non-QA title", kept("Google", title="Java Developer"), False)
+    check("company block is empty for an unknown name", india_company_block("Pixel Forge"), "")
+    check("company block is empty for a staffing firm", india_company_block("Infosys"), "")
+    check("company block is empty for a blank name", india_company_block(""), "")
+    check("stored unknown QA role stays on the board",
           matches_region(
-              {"title": "Software Engineer", "location": "Bengaluru", "company": "Pixel Forge",
+              {"title": "QA Engineer", "location": "Noida", "company": "Pixel Forge",
                "jd_text": "", "platform": "linkedin"},
               "india",
           ), True)
-    check("stored unknown data role stays off the board",
+    check("stored unknown software role stays off the board",
           matches_region(
-              {"title": "Data Engineer", "location": "Bengaluru", "company": "Pixel Forge",
+              {"title": "Software Engineer", "location": "Noida", "company": "Pixel Forge",
                "jd_text": "", "platform": "linkedin"},
               "india",
           ), False)
     check("Europe keeps a sponsor that is not on the India lists",
           kept("Revolut", "europe"), True)
-    queries = india_company_queries(["Software Engineer", "Backend Engineer"])
+    queries = india_company_queries(["QA Engineer", "SDET"])
+    check("company search is Delhi, not all of India", queries[0][1], "Delhi")
     check("one role does not multiply company searches", len(queries), len(INDIA_COMPANY_SEARCH))
     check("company search stays within forty names", len(INDIA_COMPANY_SEARCH) <= 40, True)
     check("Flipkart is searched by name", any("Flipkart" in q[0] for q in queries), True)
@@ -316,39 +318,20 @@ def test_india_companies() -> None:
 
 
 def test_titles() -> None:
-    section("2. Titles: entry-level roles pass")
+    section("2. Titles: senior QA titles pass; internships do not")
     for title in (
-        "Software Engineer, University Graduate, 2026",
-        "Software Engineer - 2026 New Grad",
-        "Software Engineer, 5G RAN",
-        "Software Engineer, 3D Graphics",
-        "Software Engineer - VPN",
-        "Software Engineer, Headless Commerce",
-        "Backend Engineer, Leadership Tools",
-        "Software Engineer, Cloud Architecture",
-        "Software Engineer I",
-        "SDE 1",
-        "Software Engineer | 1-2 years",
+        "Senior QA Engineer", "Sr. QA Engineer", "QA Lead", "QA Manager",
+        "Staff QA Engineer", "SDET II", "SDET III", "Test Engineer 3",
+        "QA Engineer | 8-10 years", "Principal SDET",
     ):
         check(f"{title!r} accepted", _title_ok(title), True)
-
-    section("2. Titles: senior / levelled roles still rejected")
-    for title in (
-        "Senior Software Engineer", "Sr. Software Engineer", "Sr Software Engineer",
-        "Staff Engineer", "Principal Engineer", "SDE III", "SDE 2", "SDE-2",
-        "Software Engineer II", "Software Engineer III", "Software Engineer 2",
-        "Software Engineer - 3", "Engineer L5", "Tech Lead", "Lead Engineer",
-        "Team Leader - Backend", "Head of Engineering", "Engineering Manager",
-        "VP Engineering", "Vice President, Technology", "Solutions Architect",
-        "Software Engineering Intern",
-    ):
-        check(f"{title!r} rejected", _title_ok(title), False)
+    check("internship rejected", _title_ok("QA Engineering Intern"), False)
     ok, reason = is_job_experience_valid(
-        {"title": "Software Engineer (Networking protocols | 4-9 years | Bangalore)",
+        {"title": "QA Engineer (API testing | 12-15 years | Noida)",
          "jd_text": ""},
         require_jd=False,
     )
-    check("a year range in the title is still over the cap", ok, False)
+    check("a year range above 10 is over the cap", ok, False)
     check("a year range is not read as a seniority level",
           "years of experience" in reason, True)
 
@@ -357,19 +340,21 @@ def test_titles() -> None:
 
 
 def test_experience() -> None:
-    section("3. Experience: 'N+ years' is a minimum")
-    check("'1+ years' accepted", _exp_ok("Requirements: 1+ years of experience with Java."), True)
-    check("'0+ years' accepted", _exp_ok("0+ years of experience."), True)
-    check("'2+ years' accepted (cap 2)", _exp_ok("2+ years of experience."), True)
-    check("'0-2 years' accepted", _exp_ok("0-2 years of experience."), True)
-    check("'3+ years' rejected", _exp_ok("3+ years of experience."), False)
-    check("'5+ yrs' rejected", _exp_ok("Minimum 5+ yrs in backend."), False)
-    check("'2-4 years' still rejected (top above cap)", _exp_ok("2-4 years of experience."), False)
-    check("'at least 3 years' rejected", _exp_ok("At least 3 years of experience."), False)
+    section("3. Experience: the floor of the range is the requirement, cap is 11")
+    check("'1+ years' accepted", _exp_ok("Requirements: 1+ years of experience with testing."), True)
+    check("'8+ years' accepted", _exp_ok("8+ years of experience."), True)
+    check("'10+ years' accepted", _exp_ok("10+ years of experience."), True)
+    check("'11+ years' accepted", _exp_ok("11+ years of experience."), True)
+    check("'8-12 years' accepted (floor is 8)", _exp_ok("8-12 years of experience."), True)
+    check("'12+ yrs' rejected", _exp_ok("Minimum 12+ yrs in testing."), False)
+    check("'12-15 years' rejected", _exp_ok("12-15 years of experience."), False)
+    check("'at least 15 years' rejected", _exp_ok("At least 15 years of experience."), False)
 
-    section("3. Experience: max_years is honoured, default unchanged")
-    check("default cap is 2: '3 years' rejected", is_job_experience_valid(
-        {"title": "Software Engineer", "jd_text": "3 years of experience."}, require_jd=False)[0], False)
+    section("3. Experience: max_years is honoured, default is 11")
+    check("default cap is 11: '12 years' rejected", is_job_experience_valid(
+        {"title": "QA Engineer", "jd_text": "12 years of experience."}, require_jd=False)[0], False)
+    check("default cap is 11: '11 years' accepted", is_job_experience_valid(
+        {"title": "QA Engineer", "jd_text": "11 years of experience."}, require_jd=False)[0], True)
     check("max_years=3 admits '3+ years'", _exp_ok("3+ years of experience.", max_years=3), True)
     check("max_years=1 rejects '2+ years'", _exp_ok("2+ years of experience.", max_years=1), False)
 
@@ -436,15 +421,18 @@ def test_tiers() -> None:
                  "MasterTech Web Applications"):
         check(f"{name!r} -> EXCLUDED", company_tier(name), Tier.EXCLUDED)
 
-    section("6. Role fit: word-bounded ROLE_BAD")
-    for title in ("Software Engineer, Internal Tools", "Software Engineer, International Payments",
-                  "Software Engineer, Internet Infrastructure", "Software Engineer, Salesforce Platform",
-                  "Software Engineer, Customer Support Platform", "Backend Engineer, Leadership Tools"):
+    section("6. Role fit: QA titles score, software titles do not")
+    for title in ("QA Automation Lead", "Senior QA Automation Engineer", "SDET",
+                  "Test Automation Lead", "QA Lead", "QA Engineer", "Test Engineer",
+                  "Software Engineer in Test"):
         check(f"{title!r} scores", role_score(title) > 0, True)
-    for title in ("Software Engineering Intern", "Software Engineer Internship", "Sales Engineer",
-                  "Technical Support Engineer", "Customer Support Executive", "Marketing Manager",
-                  "Engineering Manager", "Tech Lead", "Staff Software Engineer", "QA Engineer",
-                  "Head of Engineering", "VP Engineering"):
+    check("automation lead outranks a general QA title",
+          role_score("QA Automation Lead") > role_score("QA Engineer"), True)
+    for title in ("Manual Tester", "Junior QA Engineer", "Fresher QA"):
+        check(f"{title!r} zero", role_score(title), 0.0)
+    for title in ("Software Engineer", "Backend Engineer", "QA Intern",
+                  "Software Engineering Intern", "Sales Engineer", "Staff Software Engineer",
+                  "Engineering Manager", "DevOps Engineer"):
         check(f"{title!r} zero", role_score(title), 0.0)
 
 
@@ -530,16 +518,16 @@ def test_ledger() -> None:
     # Clear and the purges only touch the active region, so these rows have
     # to be India jobs or the endpoint leaves them alone.
     rows = [
-        Job(id="ign", title="SE", company="Google", platform="p", url="https://a.example/ign",
-            location="Bengaluru", status="ignored"),
-        Job(id="rej", title="SE", company="Google", platform="p", url="https://a.example/rej",
-            location="Bengaluru", status="rejected"),
-        Job(id="vis", title="SE", company="Google", platform="p", url="https://a.example/vis",
-            location="Bengaluru", status="discovered", visited_at=now),
-        Job(id="new", title="SE", company="Google", platform="p", url="https://a.example/new",
-            location="Bengaluru", status="discovered"),
-        Job(id="app", title="SE", company="Google", platform="p", url="https://a.example/app",
-            location="Bengaluru", status="applied"),
+        Job(id="ign", title="QA Engineer", company="Google", platform="p", url="https://a.example/ign",
+            location="Noida", status="ignored"),
+        Job(id="rej", title="QA Engineer", company="Google", platform="p", url="https://a.example/rej",
+            location="Noida", status="rejected"),
+        Job(id="vis", title="QA Engineer", company="Google", platform="p", url="https://a.example/vis",
+            location="Noida", status="discovered", visited_at=now),
+        Job(id="new", title="QA Engineer", company="Google", platform="p", url="https://a.example/new",
+            location="Noida", status="discovered"),
+        Job(id="app", title="QA Engineer", company="Google", platform="p", url="https://a.example/app",
+            location="Noida", status="applied"),
     ]
     db.add_all(rows)
     db.commit()
@@ -567,18 +555,18 @@ def test_ledger() -> None:
     db.expire_all()
     check("PATCH ignored is recorded as dismissed", _ledger_status(db, "https://b.example/p2"), "dismissed")
 
-    db.add(Job(id="st", title="SE", company="Google", platform="p", url="https://c.example/st",
-               location="Bengaluru", status="discovered", discovered_at=old, visited_at=old))
-    db.add(Job(id="st2", title="SE", company="Google", platform="p", url="https://c.example/st2",
-               location="Bengaluru", status="discovered", discovered_at=old))
+    db.add(Job(id="st", title="QA Engineer", company="Google", platform="p", url="https://c.example/st",
+               location="Noida", status="discovered", discovered_at=old, visited_at=old))
+    db.add(Job(id="st2", title="QA Engineer", company="Google", platform="p", url="https://c.example/st2",
+               location="Noida", status="discovered", discovered_at=old))
     db.commit()
     check("purge-stale answers", client.post("/api/jobs/purge-stale").status_code, 200)
     db.expire_all()
     check("purge-stale: opened row stays visited", _ledger_status(db, "https://c.example/st"), "visited")
     check("purge-stale: untouched row is expired", _ledger_status(db, "https://c.example/st2"), "expired")
 
-    senior = dict(title="Senior Software Engineer", company="Google", platform="p",
-                  location="Bengaluru", jd_text="")
+    senior = dict(title="QA Engineer", company="Google", platform="p",
+                  location="Noida", jd_text="Requires 15 years of experience in testing.")
     db.add(Job(id="ex1", url="https://d.example/ex1", status="rejected", **senior))
     db.add(Job(id="ex2", url="https://d.example/ex2", status="ignored", **senior))
     db.add(Job(id="ex3", url="https://d.example/ex3", status="discovered", **senior))
@@ -688,10 +676,10 @@ def test_apply_all() -> None:
     client = _client(Session)
     db = Session()
     now = datetime.utcnow()
-    db.add(Job(id="fresh", title="SE", company="Google", platform="p", url="https://a.example/f",
-               location="Bengaluru", status="discovered", discovered_at=now))
-    db.add(Job(id="stale", title="SE", company="Google", platform="p", url="https://a.example/s",
-               location="Bengaluru", status="discovered", discovered_at=now - timedelta(days=30)))
+    db.add(Job(id="fresh", title="QA Engineer", company="Google", platform="p", url="https://a.example/f",
+               location="Noida", status="discovered", discovered_at=now))
+    db.add(Job(id="stale", title="QA Engineer", company="Google", platform="p", url="https://a.example/s",
+               location="Noida", status="discovered", discovered_at=now - timedelta(days=30)))
     db.commit()
 
     saved_region = main.settings.target_region
@@ -742,8 +730,8 @@ def test_clear_region() -> None:
     Session = _memory_db()
     client = _client(Session)
     db = Session()
-    db.add(Job(id="in", title="SE", company="Google", platform="linkedin",
-               url="https://in.example/1", location="Bengaluru", status="discovered"))
+    db.add(Job(id="in", title="QA Engineer", company="Google", platform="linkedin",
+               url="https://in.example/1", location="Noida", status="discovered"))
     db.add(Job(id="eu", title="SE", company="Stripe", platform="linkedin",
                url="https://eu.example/1", location="London, United Kingdom", status="discovered"))
     db.add(Job(id="eu-vis", title="SE", company="Stripe", platform="linkedin",
@@ -757,7 +745,7 @@ def test_clear_region() -> None:
               client.delete("/api/jobs/clear?include_applied=true").status_code, 200)
         db.expire_all()
         left = {j.id for j in db.query(Job).all()}
-        check("india clear removes Bengaluru", "in" in left, False)
+        check("india clear removes Noida", "in" in left, False)
         check("india clear keeps London", "eu" in left, True)
         check("india clear keeps Berlin", "eu-vis" in left, True)
         check("remove-visited in India leaves Berlin",

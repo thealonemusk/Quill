@@ -4,9 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import clsx from 'clsx';
 import { api } from '@/lib/api';
-import type { Job, SettingsData } from '@/lib/types';
+import type { Job } from '@/lib/types';
 import { ScanBar } from '@/components/ScanBar';
-import { applyRegionTheme } from '@/lib/region-theme';
 import { JobCard, JobRow } from '@/components/JobRow';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -26,8 +25,6 @@ export default function JobsPage() {
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
   const [sortBy, setSortBy] = useState<'popularity' | 'score' | 'date'>('popularity');
   const [currentPage, setCurrentPage] = useState(1);
-  const [region, setRegion] = useState<SettingsData['target_region']>('india');
-  const [regionSaving, setRegionSaving] = useState(false);
 
   const loadJobs = useCallback(async (quiet = false) => {
     if (!quiet) setLoading(true);
@@ -50,12 +47,6 @@ export default function JobsPage() {
       })
       .catch(() => {});
     api.getApplyStatus().then((s) => setApplying(!!s.running)).catch(() => {});
-    api.getSettings().then((s) => {
-      if (s.target_region === 'europe' || s.target_region === 'india') {
-        setRegion(s.target_region);
-        applyRegionTheme(s.target_region);
-      }
-    }).catch(() => {});
   }, [loadJobs]);
 
   useEffect(() => {
@@ -89,21 +80,6 @@ export default function JobsPage() {
     }, 3000);
     return () => clearInterval(id);
   }, [scanning, loadJobs]);
-
-  const switchRegion = async (next: SettingsData['target_region']) => {
-    if (next === region || regionSaving) return;
-    setRegionSaving(true);
-    try {
-      await api.saveSettings({ target_region: next });
-      setRegion(next);
-      applyRegionTheme(next);
-      await loadJobs(true);
-    } catch (err) {
-      setScanError(err instanceof Error ? err.message : 'Could not switch region');
-    } finally {
-      setRegionSaving(false);
-    }
-  };
 
   const handleScan = async () => {
     if (scanning) return;
@@ -164,8 +140,7 @@ export default function JobsPage() {
       setScanError('No visited jobs to remove.');
       return;
     }
-    const place = region === 'europe' ? 'Europe' : 'India';
-    if (!confirm(`Remove ${seen} ${place} job${seen === 1 ? '' : 's'} you have already opened? The other region is left as it is.`)) return;
+    if (!confirm(`Remove ${seen} Delhi NCR job${seen === 1 ? '' : 's'} you have already opened?`)) return;
     try {
       const { removed_count } = await api.purgeVisitedJobs();
       setCurrentPage(1);
@@ -181,11 +156,10 @@ export default function JobsPage() {
       (j) => j.status === 'applied' || j.apply_status === 'applied',
     ).length;
     const rest = jobs.length - appliedCount;
-    const place = region === 'europe' ? 'Europe' : 'India';
     const detail = appliedCount
-      ? `Remove ${rest} pending and ${appliedCount} applied ${place} job${appliedCount === 1 ? '' : 's'}?\n\n` +
-        `The other region is left as it is. Applied ones stay recorded in history, so they will not come back in a scan.`
-      : `Remove ${rest} ${place} job${rest === 1 ? '' : 's'}? The other region is left as it is.`;
+      ? `Remove ${rest} pending and ${appliedCount} applied Delhi NCR job${appliedCount === 1 ? '' : 's'}?\n\n` +
+        `Applied ones stay recorded in history, so they will not come back in a scan.`
+      : `Remove ${rest} Delhi NCR job${rest === 1 ? '' : 's'}?`;
     if (!confirm(detail)) return;
     try {
       await api.clearDiscoveredJobs(true);
@@ -302,35 +276,13 @@ export default function JobsPage() {
           <div className="min-w-0 max-w-full">
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
               <h1 className="page-title text-4xl text-[var(--text-primary)] sm:text-5xl">Jobs</h1>
-              <div
-                role="group"
-                aria-label="Where to look for jobs"
-                className="inline-flex rounded-full border border-[var(--border)] bg-[var(--surface)] p-0.5"
-              >
-                {(['india', 'europe'] as const).map((key) => (
-                  <button
-                    key={key}
-                    type="button"
-                    aria-pressed={region === key}
-                    disabled={regionSaving}
-                    onClick={() => switchRegion(key)}
-                    className={clsx(
-                      'rounded-full px-3 py-1 text-xs font-semibold',
-                      region === key
-                        ? 'bg-signal'
-                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]',
-                    )}
-                  >
-                    {key === 'india' ? 'India' : 'Europe'}
-                  </button>
-                ))}
-              </div>
+              <span className="rounded-full border border-[var(--border)] bg-[var(--surface)] px-3 py-1 text-xs font-semibold text-[var(--text-secondary)]">
+                Delhi NCR
+              </span>
             </div>
-            {region === 'europe' && (
-              <p className="mt-2 text-sm text-[var(--text-secondary)]">
-                UK, Ireland, Germany, Netherlands, Sweden. Known visa sponsors only, eight jobs per company.
-              </p>
-            )}
+            <p className="mt-2 text-sm text-[var(--text-secondary)]">
+              QA automation lead, SDET, and test automation. Up to 11 years. Delhi NCR, every company.
+            </p>
             <div className="mt-3 flex flex-wrap gap-1.5">
               <span className="bg-signal rounded-full px-2.5 py-1 text-xs font-semibold">
                 {jobs.length} total

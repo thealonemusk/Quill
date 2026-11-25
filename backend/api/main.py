@@ -27,7 +27,6 @@ from backend.applier.ats import detect_ats
 from backend.autopilot.select import cap_jobs_per_company, company_tier
 from backend.applier.profile import RESUMES_DIR, load_profile, save_profile
 from backend.api.autofill import router as autofill_router
-from backend.api.autopilot import router as autopilot_router
 from backend.scrapers.filter_utils import job_in_region
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -99,7 +98,6 @@ async def local_only(request, call_next):
     return await call_next(request)
 
 app.include_router(autofill_router)
-app.include_router(autopilot_router)
 
 
 @app.on_event("startup")
@@ -509,12 +507,6 @@ def _scan_is_stalled() -> bool:
     return bool(_scan_status["running"]) and _scan_runtime() > SCAN_STALL_SECONDS
 
 
-def _autopilot_running() -> bool:
-    from backend.api.autopilot import _status as autopilot_status
-
-    return bool(autopilot_status.get("running"))
-
-
 @app.post("/api/scan")
 async def start_scan(req: ScanRequest, background_tasks: BackgroundTasks):
     """Trigger a background job scan across platforms."""
@@ -526,7 +518,7 @@ async def start_scan(req: ScanRequest, background_tasks: BackgroundTasks):
         )
     # A scan and a fill share one persistent Chrome profile; the second to
     # start cannot open it, and the scan then reports "0 roles" silently.
-    if _apply_status["running"] or _autopilot_running():
+    if _apply_status["running"]:
         raise HTTPException(status_code=409, detail="An apply run is in progress — wait for it to finish")
     if _scan_is_stalled():
         logger.warning(
@@ -671,8 +663,6 @@ async def start_apply(
         raise HTTPException(status_code=409, detail="Apply already running")
     if _scan_status["running"]:
         raise HTTPException(status_code=409, detail="Scan is running — wait until it finishes")
-    if _autopilot_running():
-        raise HTTPException(status_code=409, detail="Autopilot is running — wait until it finishes")
 
     profile = load_profile()
     missing = [m for m in profile.missing_required() if m != "resume"]

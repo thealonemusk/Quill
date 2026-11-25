@@ -13,8 +13,8 @@ Board IDs verified against live APIs (404 / wrong-company entries removed).
 
 # Shared India location keywords used across companies
 INDIA_LOCS = [
-    "india", "bangalore", "bengaluru", "hyderabad", "pune", "mumbai",
-    "delhi", "noida", "gurgaon", "gurugram", "remote - india","remote, india", "in - ",
+    "delhi", "new delhi", "noida", "greater noida", "gurgaon", "gurugram",
+    "ghaziabad", "faridabad", "ncr",
 ]
 
 TOP_COMPANIES = [

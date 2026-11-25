@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import List, Tuple
 
 from backend.autopilot.select import Tier, company_tier
-from backend.scrapers.filter_utils import parse_experience_years, ENTRY_TITLE_SIGNALS
+from backend.scrapers.filter_utils import parse_experience_years
 
 # Company quality comes from `autopilot.select.company_tier`, which is the
 # curated FAANG/ELITE/STRONG/KNOWN ranking and matches on whole words.
@@ -74,9 +74,13 @@ def score_job(
         score += 12
         reasons.append("Partial role match")
 
-    if any(sig in title_lower for sig in ENTRY_TITLE_SIGNALS):
-        score += 14
-        reasons.append("Entry-level signals")
+    # Tools on the resume. A JD that names them is a closer match than a
+    # generic QA lead posting. Missing them does not drop the job.
+    stack = ("selenium", "appium", "playwright", "restassured", "rest assured", "testng", "jmeter")
+    stack_hits = sum(1 for tool in stack if tool in jd_lower or tool in title_lower)
+    if stack_hits:
+        score += min(12, stack_hits * 4)
+        reasons.append("Automation stack")
 
     loc_hit = False
     for loc in preferred_locations:

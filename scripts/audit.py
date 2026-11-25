@@ -224,7 +224,7 @@ def check_wiring() -> None:
             bad(f"{module} exists but nothing imports it")
 
     routes = json.dumps(sorted(_api_routes()))
-    for prefix in ("/api/autofill", "/api/autopilot", "/api/jobs", "/api/scan"):
+    for prefix in ("/api/autofill", "/api/jobs", "/api/scan"):
         if prefix in routes:
             ok(f"routes mounted: {prefix}")
         else:

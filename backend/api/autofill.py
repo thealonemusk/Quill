@@ -19,6 +19,7 @@ from typing import Dict, List, Optional
 from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -39,6 +40,7 @@ from backend.applier.profile import ApplicantProfile, load_profile
 from backend.config import settings
 from backend.applier.sections import KINDS, needed_counts, section_value, skill_list
 from backend.db.models import Job, get_db
+from backend.resume.tailor import tailored_pdf
 
 router = APIRouter(prefix="/api/autofill", tags=["autofill"])
 
@@ -726,8 +728,20 @@ def tailor_status(job_id: str):
     if not status:
         raise HTTPException(status_code=404, detail="No tailoring run for this job")
     if status.get("ok"):
-        status["pdf_url"] = f"/api/autopilot/resume/{job_id}"
+        status["pdf_url"] = f"/api/autofill/resume/{job_id}"
     return status
+
+
+@router.get("/resume/{job_id}")
+def tailored_resume(job_id: str):
+    """The tailored PDF for this job. The id is a token, not a path."""
+    if not re.fullmatch(r"[0-9A-Za-z-]{8,64}", job_id or ""):
+        raise HTTPException(status_code=404, detail="No tailored resume for this job")
+    match = tailored_pdf(job_id)
+    if match:
+        return FileResponse(match, media_type="application/pdf",
+                            filename=f"resume_{job_id[:8]}.pdf")
+    raise HTTPException(status_code=404, detail="No tailored resume for this job")
 
 
 @router.post("/track")

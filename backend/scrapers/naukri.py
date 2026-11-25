@@ -1,5 +1,5 @@
 """
-Naukri.com Job Scraper — searches entry-level (0-2 yr) jobs on Naukri.com.
+Naukri.com Job Scraper — QA roles in Delhi NCR.
 Uses public search URLs; no login required.
 """
 from typing import List, Set
@@ -15,8 +15,7 @@ from backend.config import settings
 from backend.job_freshness import NAUKRI_JOB_AGE_DAYS
 
 NAUKRI_LOCATIONS = [
-    "Bengaluru", "Hyderabad", "Pune", "Mumbai", "Gurugram", "Gurgaon",
-    "Noida", "Delhi", "Chennai", "Kolkata",
+    "Delhi", "Noida", "Gurugram", "Ghaziabad", "Faridabad",
 ]
 NAUKRI_PAGES = 2
 SKIP_SEARCH_LOCATIONS = {"remote", "work from home", "wfh", "anywhere"}
@@ -57,7 +56,7 @@ async def scrape_naukri_jobs(
     max_jobs: int = 300,
     headless: bool = True,
 ) -> List[dict]:
-    """Scrape 0-2 year jobs from Naukri.com."""
+    """Scrape QA jobs in Delhi NCR from Naukri.com."""
     roles = resolve_discovery_roles(roles or settings.target_roles_list)
     locations = _merge_locations(locations or settings.preferred_locations_list)
     all_jobs: List[dict] = []

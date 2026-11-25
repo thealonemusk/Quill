@@ -45,13 +45,13 @@ class Settings(BaseSettings):
     user_linkedin_url: str = ""
     user_portfolio: str = ""
 
-    # Job preferences
-    target_roles: str = "Software Engineer,Backend Engineer"
-    experience_years: int = 2
-    preferred_locations: str = "Bengaluru,Remote"
-    # india | europe. Europe is UK, Ireland, Germany, the Netherlands, and Sweden.
+    # Job preferences. QA titles, up to 10 years, Delhi NCR, every employer.
+    target_roles: str = "QA Automation Lead,QA Lead,Senior QA Automation Engineer,SDET,Test Automation Lead"
+    experience_years: int = 11
+    preferred_locations: str = "Delhi,Noida,Gurugram,Ghaziabad,Faridabad"
+    # Kept so an old setting still parses. The product searches Delhi NCR only.
     target_region: str = "india"
-    min_relevance_score: int = 55
+    min_relevance_score: int = 0
     excluded_companies: str = ""
 
     # Resume tailoring

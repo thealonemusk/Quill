@@ -19,7 +19,6 @@ from bs4 import BeautifulSoup
 
 from backend.scrapers.filter_utils import (
     ENTRY_TITLE_SIGNALS,
-    EXCLUDED_TITLE_KEYWORDS,
     INTERN_PATTERN,
     is_career_listing_eligible,
     passes_hard_filters,
@@ -32,28 +31,21 @@ HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
 }
 
-# Extra title aliases beyond the pipeline role strings (SDE, fullstack, etc.)
+# QA titles beyond the strings in settings. A senior title is in scope.
 ROLE_ALIASES = [
-    "software engineer",
-    "software developer",
-    "software development engineer",
-    "backend engineer",
-    "backend developer",
-    "full stack",
-    "fullstack",
-    "full-stack",
-    "ai engineer",
-    "ml engineer",
-    "machine learning engineer",
-    "python developer",
-    "java developer",
-    "golang developer",
-    "go developer",
-    "platform engineer",
-    "sde",
-    "new grad",
-    "university graduate",
-    "graduate engineer",
+    "qa automation",
+    "qa lead",
+    "qa manager",
+    "automation lead",
+    "test automation",
+    "automation engineer",
+    "automation architect",
+    "sdet",
+    "qa engineer",
+    "quality assurance",
+    "test lead",
+    "software engineer in test",
+    "software development engineer in test",
 ]
 
 
@@ -140,15 +132,11 @@ def _passes_career_filters(job_data: dict) -> bool:
 
 
 def _role_matches(title: str, roles: List[str]) -> bool:
-    """Check if a job title matches any of the target roles, excluding senior/lead/intern roles."""
+    """QA titles, including senior. Internships are not a match."""
     title_lower = title.lower()
 
     if INTERN_PATTERN.search(title):
         return False
-
-    for keyword in EXCLUDED_TITLE_KEYWORDS:
-        if keyword in title_lower:
-            return False
 
     needles = [r.lower() for r in roles] + ROLE_ALIASES
     for role_lower in needles:

@@ -102,7 +102,7 @@ def run() -> None:
         done = wait(r["job_id"])
         check("the run finishes", done.get("state"), "done")
         check("...and the stub got the saved JD", seen[-1] == " ".join(SAVED_JD.split()), True)
-        check("status names the PDF", done.get("pdf_url"), f"/api/autopilot/resume/{r['job_id']}")
+        check("status names the PDF", done.get("pdf_url"), f"/api/autofill/resume/{r['job_id']}")
         check("status reports what changed", (done.get("reworded"), done.get("refused"), done.get("pages")), (3, 1, 1))
         with Session() as db:
             check("an open job is marked tailored", db.get(Job, "known-job-0001").status, "tailored")
